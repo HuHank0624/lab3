@@ -1,9 +1,12 @@
 # path: player_client/lobby.py
 import socket
 from typing import Dict, Any, List, Optional
-
-from .utils import send_json, recv_json
+from utils.protocol import send_json, recv_json
 from .library import GameLibrary
+import subprocess
+import os
+import sys
+from .utils import GAMES_ROOT
 
 
 class LobbyClient:
@@ -136,23 +139,40 @@ class LobbyClient:
         resp = recv_json(self.sock)
         print("伺服器:", resp)
 
-    def start_game(self) -> None:
-        """
-        房主在房內時，對應 server: start_game。
-        真正啟動 game server + 本地 CLI 遊戲目前只 stub 提示，因為每個遊戲實作不同。
-        """
+    def start_game(self):
         room_id = input("房主請輸入要開始的 room_id：").strip()
-        send_json(self.sock, {
-            "action": "start_game",
-            "room_id": room_id,
-        })
+        send_json(self.sock, {"action": "start_game", "room_id": room_id})
         resp = recv_json(self.sock)
         print("伺服器:", resp)
 
-        if resp and resp.get("status") == "ok":
-            room_info = resp.get("room_info", {})
-            game_port = room_info.get("game_port")
-            game_id = room_info.get("game_id")
-            print(f"📢 遊戲開始！房間 {room_id} 使用 game_port={game_port}")
-            print("目前平台端只做到大廳與房間控制。")
-            print("實際遊戲可在這邊根據 game_id、game_port 去啟動你自己的 CLI/GUI 遊戲。")
+        if resp.get("status") != "ok":
+            return
+
+        room_info = resp["room_info"]
+        game_port = resp["game_port"]
+        game_id = room_info["game_id"]
+
+        # 找到本地 game 資料夾
+        game_dir = None
+        for d in GAMES_ROOT.iterdir():
+            if d.name.startswith(game_id):
+                game_dir = d
+                break
+        if not game_dir:
+            print("⚠ 遊戲尚未下載")
+            return
+
+        # 找 entry
+        entry = None
+        for f in game_dir.rglob("*client*.py"):
+            entry = f
+            break
+        if not entry:
+            print("⚠ 找不到 client entry")
+            return
+
+        # 啟動遊戲
+        cmd = [sys.executable, str(entry), "--host", "127.0.0.1", "--port", str(game_port), "--name", self.username]
+        print("🎮 啟動遊戲：", cmd)
+        subprocess.Popen(cmd)
+

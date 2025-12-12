@@ -6,7 +6,7 @@ import uuid
 import hashlib
 from typing import Dict, Any, List, Optional
 
-from .utils import DB_DIR, log
+from .utils import *
 
 
 USERS_PATH = os.path.join(DB_DIR, "users.json")

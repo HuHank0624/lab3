@@ -3,13 +3,13 @@ import socket
 import threading
 from typing import Dict, Any
 
-from utils.protocol import recv_json
 from .auth import AuthManager
 from .data import DataStore
 from .game_manager import GameManager
 from .lobby_manager import LobbyManager
 from .handlers import RequestHandlers
-from .utils import SERVER_HOST, SERVER_PORT, log
+from .utils import *
+from utils.protocol import recv_json
 
 
 class GamePlatformServer:

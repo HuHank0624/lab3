@@ -1,6 +1,6 @@
 # path: developer_client/auth.py
 from typing import Optional, Dict
-from .utils import send_json, recv_json
+from utils.protocol import send_json, recv_json
 import socket
 
 

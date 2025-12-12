@@ -5,8 +5,8 @@ import zipfile
 from pathlib import Path
 import socket
 from typing import Dict, Any, Optional
-
-from .utils import send_json, recv_json, DOWNLOAD_ROOT, GAMES_ROOT
+from utils.protocol import send_json, recv_json
+from .utils import DOWNLOAD_ROOT, GAMES_ROOT
 
 
 class GameDownloader:

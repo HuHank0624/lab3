@@ -3,6 +3,8 @@ from typing import Dict, Any, List, Optional
 
 from .data import DataStore
 from .utils import log
+# server/lobby_manager.py
+from .game_runtime import GameRuntime
 
 
 class LobbyManager:
@@ -10,6 +12,8 @@ class LobbyManager:
 
     def __init__(self, datastore: DataStore):
         self.datastore = datastore
+        self.runtime = GameRuntime()
+
         # For potential future: mapping room_id -> game server process/port etc.
 
     def list_rooms(self) -> List[Dict[str, Any]]:
@@ -57,8 +61,21 @@ class LobbyManager:
             return {"status": "error", "message": "Room not found"}
         if room["status"] != "waiting":
             return {"status": "error", "message": "Already started"}
+
+        game = self.datastore.get_game(room["game_id"])
+        if not game:
+            return {"status": "error", "message": "Game not found"}
+
+        port = room["game_port"]
+
+        # 🟢 啟動遊戲伺服器
+        ok = self.runtime.start_game_server(room_id, game, port)
+        if not ok:
+            return {"status": "error", "message": "Failed to launch game server"}
+
         self.datastore.update_room_status(room_id, "playing")
-        # In a full implementation, here we would inform GameManager to ensure
-        # corresponding game server is started (if not already).
-        log(f"Room {room_id} status changed to 'playing'")
-        return {"status": "ok", "room_info": self.datastore.get_room(room_id)}
+        return {
+            "status": "ok",
+            "room_info": self.datastore.get_room(room_id),
+            "game_port": port,
+        }

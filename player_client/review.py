@@ -1,8 +1,7 @@
 # path: player_client/review.py
 import socket
 from typing import Dict, Any, List
-
-from .utils import send_json, recv_json
+from utils.protocol import send_json, recv_json
 
 
 class ReviewClient:

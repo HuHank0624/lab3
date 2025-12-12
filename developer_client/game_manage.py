@@ -1,6 +1,6 @@
 # path: developer_client/game_manage.py
 import socket
-from .utils import send_json, recv_json
+from utils.protocol import send_json, recv_json
 
 
 class GameManagerClient:
