@@ -127,34 +127,35 @@ class GameStoreClient:
         """Download game from server via chunk protocol."""
         game_id = game["game_id"]
         name = game["name"]
+        version = game.get("version", "1")
         
-        print(f"\n⬇️ Downloading game: {name}...")
+        print(f"\nDownloading game: {name} v{version}...")
 
         send_json(self.sock, {
             "action": "download_game",
             "game_id": game_id,
         })
 
-        # Create directory for download
-        game_dir = os.path.join(DOWNLOAD_ROOT, self.username)
-        os.makedirs(game_dir, exist_ok=True)
-        zip_path = os.path.join(game_dir, f"{game_id}.zip")
+        # Create directory for download (per-user)
+        user_download_dir = os.path.join(DOWNLOAD_ROOT, self.username)
+        os.makedirs(user_download_dir, exist_ok=True)
+        zip_path = os.path.join(user_download_dir, f"{name}.zip")
 
         try:
             with open(zip_path, "wb") as f:
                 while True:
                     msg = recv_json(self.sock)
                     if not msg:
-                        print("❌ Connection lost")
+                        print("Connection lost")
                         return False
 
                     # Check for error response
                     if msg.get("status") == "error":
-                        print(f"❌ Download failed: {msg.get('message', 'Unknown error')}")
+                        print(f"Download failed: {msg.get('message', 'Unknown error')}")
                         return False
 
                     if msg.get("action") != "download_chunk":
-                        print(f"❌ Unexpected response: {msg.get('message', msg)}")
+                        print(f"Unexpected response: {msg.get('message', msg)}")
                         return False
 
                     if msg.get("eof"):
@@ -164,23 +165,45 @@ class GameStoreClient:
                     if data:
                         f.write(decode_chunk(data))
 
-            print(f"✅ Download complete: {zip_path}")
+            print(f"Download complete: {zip_path}")
 
-            # Extract to games directory
-            game_dir_name = f"{game_id}_{name.replace(' ', '_')}"
-            extract_path = os.path.join(GAMES_ROOT, game_dir_name)
+            # Extract to per-user games directory using game name
+            user_games_dir = os.path.join(GAMES_ROOT, self.username)
+            os.makedirs(user_games_dir, exist_ok=True)
+            
+            # Use game name as folder name (with game_id prefix for uniqueness)
+            game_folder_name = f"{name.replace(' ', '_')}"
+            extract_path = os.path.join(user_games_dir, game_folder_name)
+            
+            # Remove old version if exists
+            if os.path.exists(extract_path):
+                import shutil
+                shutil.rmtree(extract_path)
+            
             os.makedirs(extract_path, exist_ok=True)
 
             try:
                 with zipfile.ZipFile(zip_path, "r") as zf:
                     zf.extractall(extract_path)
-                print(f"✅ Extracted to: {extract_path}")
+                
+                # Save game info for version tracking
+                info_path = os.path.join(extract_path, "game_info.json")
+                with open(info_path, "w", encoding="utf-8") as f:
+                    import json
+                    json.dump({
+                        "game_id": game_id,
+                        "name": name,
+                        "version": version,
+                        "developer": game.get("developer", ""),
+                    }, f, indent=2)
+                
+                print(f"Extracted to: {extract_path}")
             except zipfile.BadZipFile:
-                print("❌ Corrupted zip file")
+                print("Corrupted zip file")
                 return False
 
             return True
 
         except Exception as e:
-            print(f"❌ Download error: {e}")
+            print(f"Download error: {e}")
             return False

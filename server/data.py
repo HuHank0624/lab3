@@ -234,6 +234,14 @@ class DataStore:
                     return r
         return None
 
+    def get_room_by_host(self, host: str) -> Optional[Dict[str, Any]]:
+        """Get room where user is the host."""
+        with self.rooms.with_lock():
+            for r in self.rooms.data["rooms"]:
+                if r["host"] == host:
+                    return r
+        return None
+
     def create_room(
         self,
         room_name: str,
@@ -285,6 +293,16 @@ class DataStore:
                     # destroy room if empty
                     if not players:
                         rooms.remove(r)
+                    self.rooms.save()
+                    return
+
+    def delete_room(self, room_id: str) -> None:
+        """Forcefully delete a room."""
+        with self.rooms.with_lock():
+            rooms = self.rooms.data["rooms"]
+            for r in rooms[:]:
+                if r["room_id"] == room_id:
+                    rooms.remove(r)
                     self.rooms.save()
                     return
 

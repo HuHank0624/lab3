@@ -10,7 +10,7 @@ HEADER_FMT = "!I"  # 4-byte length prefix
 # ---------- local directories for this player client ----------
 
 BASE_DIR = Path(__file__).resolve().parent
-DOWNLOAD_ROOT = BASE_DIR / "downloads"      # downloads/<username>/
-GAMES_ROOT = BASE_DIR / "games"             # games/<game_id>_<name>/
+DOWNLOAD_ROOT = BASE_DIR / "downloads"      # downloads/<username>/<game>.zip
+GAMES_ROOT = BASE_DIR / "games"             # games/<username>/<game_name>/
 DOWNLOAD_ROOT.mkdir(exist_ok=True)
 GAMES_ROOT.mkdir(exist_ok=True)

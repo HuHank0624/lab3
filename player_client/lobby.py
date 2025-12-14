@@ -22,7 +22,7 @@ class LobbyClient:
         send_json(self.sock, {"action": "list_rooms"})
         resp = recv_json(self.sock)
         if not resp or resp.get("status") != "ok":
-            print("❌ 無法取得房間列表:", resp)
+            print("???��??��??��??�表:", resp)
             return []
         return resp.get("rooms", [])
 
@@ -30,7 +30,7 @@ class LobbyClient:
         send_json(self.sock, {"action": "list_games"})
         resp = recv_json(self.sock)
         if not resp or resp.get("status") != "ok":
-            print("❌ 無法取得遊戲列表:", resp)
+            print("???��??��??�戲?�表:", resp)
             return []
         return resp.get("games", [])
 
@@ -38,7 +38,7 @@ class LobbyClient:
         """Show all games and let user choose one."""
         games = self._fetch_games()
         if not games:
-            print("⚠ No games available in store.")
+            print("??No games available in store.")
             return None
 
         print("\n=== Select a Game ===")
@@ -56,17 +56,39 @@ class LobbyClient:
         return None
 
     def _is_game_installed(self, game_id: str) -> bool:
-        """Check if game is installed locally."""
-        for d in GAMES_ROOT.iterdir():
-            if d.name.startswith(game_id):
-                return True
+        """Check if game is installed locally for this user."""
+        user_games_dir = GAMES_ROOT / self.username
+        if not user_games_dir.exists():
+            return False
+        for d in user_games_dir.iterdir():
+            info_file = d / "game_info.json"
+            if info_file.exists():
+                try:
+                    import json
+                    with open(info_file, "r") as f:
+                        info = json.load(f)
+                        if info.get("game_id") == game_id:
+                            return True
+                except:
+                    pass
         return False
 
     def _get_game_dir(self, game_id: str) -> Optional[str]:
-        """Get game directory if installed."""
-        for d in GAMES_ROOT.iterdir():
-            if d.name.startswith(game_id):
-                return str(d)
+        """Get game directory if installed for this user."""
+        user_games_dir = GAMES_ROOT / self.username
+        if not user_games_dir.exists():
+            return None
+        for d in user_games_dir.iterdir():
+            info_file = d / "game_info.json"
+            if info_file.exists():
+                try:
+                    import json
+                    with open(info_file, "r") as f:
+                        info = json.load(f)
+                        if info.get("game_id") == game_id:
+                            return str(d)
+                except:
+                    pass
         return None
 
     # ----- main lobby flow -----
@@ -80,7 +102,7 @@ class LobbyClient:
                 print("2. Create new room")
                 print("3. Join room")
                 print("4. Leave room")
-                print("n. Next page →")
+                print("n. Next page ->")
                 print("0. Back to main menu")
                 choice = input("> ").strip().lower()
 
@@ -102,7 +124,8 @@ class LobbyClient:
                 print("\n=== Game Lobby (Page 2/2) ===")
                 print("5. Start game (host only)")
                 print("6. Launch game client (after host starts)")
-                print("p. ← Previous page")
+                print("7. Close room (host only)")
+                print("p. <- Previous page")
                 print("0. Back to main menu")
                 choice = input("> ").strip().lower()
 
@@ -112,6 +135,8 @@ class LobbyClient:
                     self.start_game()
                 elif choice == "6":
                     self.launch_game_client()
+                elif choice == "7":
+                    self.close_room()
                 elif choice == "p":
                     page = 1
                 else:
@@ -142,7 +167,7 @@ class LobbyClient:
 
         # Check if game is installed
         if not self._is_game_installed(game["game_id"]):
-            print(f"⚠ Game not downloaded. Please download '{game['name']}' from the store first.")
+            print(f"??Game not downloaded. Please download '{game['name']}' from the store first.")
             return
 
         room_name = input("Room name: ").strip() or "Room"
@@ -159,10 +184,10 @@ class LobbyClient:
         
         if resp and resp.get("status") == "ok":
             self.current_room_id = resp.get("room_id")
-            print(f"✅ Room created! Room ID: {self.current_room_id}")
+            print(f"??Room created! Room ID: {self.current_room_id}")
             print(f"   Game port: {resp.get('game_port')}")
         else:
-            print(f"❌ Failed to create room: {resp.get('message', 'Unknown error')}")
+            print(f"??Failed to create room: {resp.get('message', 'Unknown error')}")
 
     def join_room(self) -> None:
         self.show_rooms()
@@ -180,13 +205,13 @@ class LobbyClient:
             self.current_room_id = room_id
             room_info = resp.get("room_info", {})
             game_id = room_info.get("game_id")
-            print(f"✅ Successfully joined room {room_id}")
+            print(f"??Successfully joined room {room_id}")
             
             # Check if game is installed
             if game_id and not self._is_game_installed(game_id):
-                print(f"⚠ Note: Game not downloaded yet. Please download before game starts.")
+                print(f"??Note: Game not downloaded yet. Please download before game starts.")
         else:
-            print(f"❌ Failed to join: {resp.get('message', 'Unknown error')}")
+            print(f"??Failed to join: {resp.get('message', 'Unknown error')}")
 
     def leave_room(self) -> None:
         if self.current_room_id:
@@ -204,11 +229,32 @@ class LobbyClient:
         resp = recv_json(self.sock)
         
         if resp and resp.get("status") == "ok":
-            print(f"✅ Left room {room_id}")
+            print(f"Left room {room_id}")
             if self.current_room_id == room_id:
                 self.current_room_id = None
         else:
-            print(f"❌ Failed to leave: {resp.get('message', 'Unknown error')}")
+            print(f"Failed to leave: {resp.get('message', 'Unknown error')}")
+
+    def close_room(self) -> None:
+        """Close/delete a room (host only). Useful when game ends or has issues."""
+        if self.current_room_id:
+            room_id = self.current_room_id
+            print(f"Using current room: {room_id}")
+        else:
+            room_id = input("Enter room_id to close: ").strip()
+
+        if not room_id:
+            return
+
+        send_json(self.sock, {"action": "close_room", "room_id": room_id})
+        resp = recv_json(self.sock)
+
+        if resp and resp.get("status") == "ok":
+            print(f"Room {room_id} closed.")
+            if self.current_room_id == room_id:
+                self.current_room_id = None
+        else:
+            print(f"Failed to close: {resp.get('message', 'Unknown error')}")
 
     def start_game(self) -> None:
         if self.current_room_id:
@@ -224,19 +270,19 @@ class LobbyClient:
         resp = recv_json(self.sock)
 
         if resp.get("status") != "ok":
-            print(f"❌ Failed to start: {resp.get('message', 'Unknown error')}")
+            print(f"??Failed to start: {resp.get('message', 'Unknown error')}")
             return
 
         room_info = resp.get("room_info", {})
         game_port = resp.get("game_port")
         game_id = room_info.get("game_id")
 
-        print(f"✅ Game starting on port {game_port}")
+        print(f"??Game starting on port {game_port}")
 
         # Find local game directory
         game_dir = self._get_game_dir(game_id)
         if not game_dir:
-            print("⚠ Game not downloaded, cannot launch client")
+            print("??Game not downloaded, cannot launch client")
             return
 
         # Find client entry
@@ -250,7 +296,7 @@ class LobbyClient:
                 break
 
         if not entry:
-            print("⚠ Cannot find client entry file")
+            print("??Cannot find client entry file")
             return
 
         # Launch game client
@@ -260,13 +306,13 @@ class LobbyClient:
             "--port", str(game_port),
             "--name", self.username
         ]
-        print(f"🎮 Launching game: {' '.join(cmd)}")
+        print(f"?�� Launching game: {' '.join(cmd)}")
         
         try:
             subprocess.Popen(cmd)
-            print("✅ Game launched!")
+            print("??Game launched!")
         except Exception as e:
-            print(f"❌ Launch failed: {e}")
+            print(f"??Launch failed: {e}")
 
     def launch_game_client(self) -> None:
         """For non-host players to launch game client after host starts."""
@@ -284,28 +330,28 @@ class LobbyClient:
         resp = recv_json(self.sock)
 
         if resp.get("status") != "ok":
-            print(f"❌ Failed: {resp.get('message', 'Unknown error')}")
+            print(f"??Failed: {resp.get('message', 'Unknown error')}")
             return
 
         room_info = resp.get("room")
         if not room_info:
-            print("❌ Room info not found")
+            print("??Room info not found")
             return
 
         if room_info.get("status") != "playing":
-            print(f"⚠ Game not started yet. Status: {room_info.get('status')}")
+            print(f"??Game not started yet. Status: {room_info.get('status')}")
             print("  Wait for the host to start the game, then try again.")
             return
 
         game_port = room_info.get("game_port")
         game_id = room_info.get("game_id")
 
-        print(f"✅ Game is running on port {game_port}")
+        print(f"??Game is running on port {game_port}")
 
         # Find local game directory
         game_dir = self._get_game_dir(game_id)
         if not game_dir:
-            print("⚠ Game not downloaded, cannot launch client")
+            print("??Game not downloaded, cannot launch client")
             return
 
         # Find client entry
@@ -319,7 +365,7 @@ class LobbyClient:
                 break
 
         if not entry:
-            print("⚠ Cannot find client entry file")
+            print("??Cannot find client entry file")
             return
 
         # Launch game client
@@ -329,11 +375,12 @@ class LobbyClient:
             "--port", str(game_port),
             "--name", self.username
         ]
-        print(f"🎮 Launching game: {' '.join(cmd)}")
+        print(f"?�� Launching game: {' '.join(cmd)}")
         
         try:
             subprocess.Popen(cmd)
-            print("✅ Game launched!")
+            print("??Game launched!")
         except Exception as e:
-            print(f"❌ Launch failed: {e}")
+            print(f"??Launch failed: {e}")
+
 

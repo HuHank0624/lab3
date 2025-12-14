@@ -58,6 +58,25 @@ class LobbyManager:
         self.datastore.leave_room(room_id, username)
         return {"status": "ok"}
 
+    def close_room(self, room_id: str) -> Dict[str, Any]:
+        """Close/delete a room and stop any running game server."""
+        room = self.datastore.get_room(room_id)
+        if not room:
+            return {"status": "error", "message": "Room not found"}
+
+        # Stop game server if running
+        if room_id in self.runtime.running_servers:
+            proc = self.runtime.running_servers[room_id]
+            try:
+                proc.terminate()
+            except:
+                pass
+            del self.runtime.running_servers[room_id]
+
+        # Delete room from database
+        self.datastore.delete_room(room_id)
+        return {"status": "ok"}
+
     def start_game(self, room_id: str, username: str) -> Dict[str, Any]:
         room = self.datastore.get_room(room_id)
         if not room:

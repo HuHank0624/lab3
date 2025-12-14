@@ -8,22 +8,23 @@ def reset_db():
     # Empty users
     users_path = os.path.join(DB_DIR, "users.json")
     with open(users_path, "w", encoding="utf-8") as f:
-        json.dump([], f, indent=2)
-    print(f"✅ Reset {users_path}")
+        json.dump({"users": []}, f, indent=2)
+    print(f"Reset {users_path}")
 
     # Empty games
     games_path = os.path.join(DB_DIR, "games.json")
     with open(games_path, "w", encoding="utf-8") as f:
-        json.dump([], f, indent=2)
-    print(f"✅ Reset {games_path}")
+        json.dump({"games": []}, f, indent=2)
+    print(f"Reset {games_path}")
 
     # Empty rooms
     rooms_path = os.path.join(DB_DIR, "rooms.json")
     with open(rooms_path, "w", encoding="utf-8") as f:
-        json.dump([], f, indent=2)
-    print(f"✅ Reset {rooms_path}")
+        json.dump({"rooms": []}, f, indent=2)
+    print(f"Reset {rooms_path}")
 
-    print("\n🎉 Database reset complete!")
+    print("\nDatabase reset complete!")
+    print("NOTE: Restart the server for changes to take effect.")
 
 if __name__ == "__main__":
     reset_db()

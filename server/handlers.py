@@ -102,8 +102,6 @@ class RequestHandlers:
     # ---- basic auth ----
 
     def _handle_register(self, sock, msg: Dict[str, Any]) -> None:
-        log("🔥 USING NEW REGISTER HANDLER 🔥")
-
         username = msg.get("username", "").strip()
         password = msg.get("password", "")
         role = msg.get("role", "")
@@ -228,6 +226,12 @@ class RequestHandlers:
             send_error(sock, "Game not found")
             return
 
+        # Check if user already has a room
+        existing_room = self.datastore.get_room_by_host(username)
+        if existing_room:
+            send_error(sock, f"You already have a room (ID: {existing_room['room_id']}). Please close it first.")
+            return
+
         port = self.games.allocate_game_port()
         resp = self.lobby.create_room(
             host_username=username,
@@ -258,6 +262,26 @@ class RequestHandlers:
 
         self.lobby.leave_room(room_id, username)
         send_ok(sock)
+
+    def _handle_close_room(self, sock, username: str, msg: Dict[str, Any]) -> None:
+        room_id = msg.get("room_id")
+        if not room_id:
+            send_error(sock, "room_id required")
+            return
+
+        room = self.lobby.datastore.get_room(room_id)
+        if not room:
+            send_error(sock, "Room not found")
+            return
+        if room.get("host") != username:
+            send_error(sock, "Only the host can close the room")
+            return
+
+        resp = self.lobby.close_room(room_id)
+        if resp["status"] == "ok":
+            send_ok(sock)
+        else:
+            send_error(sock, resp["message"])
 
     def _handle_start_game(self, sock, username: str, msg: Dict[str, Any]) -> None:
         room_id = msg.get("room_id")

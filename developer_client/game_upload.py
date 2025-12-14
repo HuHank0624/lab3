@@ -9,8 +9,8 @@ from pathlib import Path
 from utils.protocol import send_json, recv_json
 from utils.file_transfer import encode_chunk
 
-# Default games directory
-GAMES_DIR = Path(__file__).resolve().parent.parent / "games"
+# Developer games directory (under developer_client/)
+GAMES_DIR = Path(__file__).resolve().parent / "games"
 
 
 class GameUploader:
