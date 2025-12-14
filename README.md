@@ -334,29 +334,100 @@ SERVER_PORT = 10001
 
 ---
 
-## 🖥️ School Server Deployment
+## 🖥️ School Server Deployment (Workshop Demo)
 
-### On School Server (SSH)
+### Step 1: SSH to School Server
 ```bash
-ssh user@linux1.cs.nycu.edu.tw
+# Connect to school server (choose one)
+ssh <student_id>@linux1.cs.nycu.edu.tw
+# Or: linux2, linux3, linux4
+
+# Enter your password when prompted
+```
+
+### Step 2: Setup Project on Server
+```bash
+# Option A: Clone from git
+cd ~
+git clone <your-repo-url> lab3
 cd lab3
-make reset          # Clean start
-make server-bg      # Run server in background
+
+# Option B: Upload via SCP (from local Windows PowerShell)
+# scp -r C:\Users\ASUS\Desktop\114-1\Intro_to_NP\lab3 <student_id>@linux1.cs.nycu.edu.tw:~/
 ```
 
-### On TA's Machine
+### Step 3: Start Server on School Machine
 ```bash
-# Edit config.py:
-SERVER_HOST = "linux1.cs.nycu.edu.tw"
+# Reset database for clean demo
+python3 reset_db.py
 
-make dev    # Developer client
-make player # Player client
+# Start server in background
+nohup python3 -m server.server > server.log 2>&1 &
+
+# Verify server is running
+ps aux | grep server.server
+cat server.log
 ```
 
-### Stop Server
+### Step 4: Configure Local Clients
+On your **local Windows machine**, edit `config.py`:
+```python
+SERVER_HOST = "linux1.cs.nycu.edu.tw"  # Change from 127.0.0.1
+SERVER_PORT = 10001
+```
+
+### Step 5: Run Demo
+```powershell
+# Terminal 1: Developer Client
+python -m developer_client.client
+
+# Terminal 2: Player 1
+python -m player_client.client
+
+# Terminal 3: Player 2
+python -m player_client.client
+```
+
+### Step 6: Stop Server (After Demo)
 ```bash
+# SSH back to server
+ssh <student_id>@linux1.cs.nycu.edu.tw
+
+# Kill server process
 pkill -f 'python3 -m server.server'
+
+# Or find and kill by PID
+ps aux | grep server
+kill <PID>
 ```
+
+### Quick Reference Commands
+
+| Task | Command |
+|------|---------|
+| SSH Login | `ssh <id>@linux1.cs.nycu.edu.tw` |
+| Start Server (foreground) | `python3 -m server.server` |
+| Start Server (background) | `nohup python3 -m server.server > server.log 2>&1 &` |
+| Check if running | `ps aux \| grep server` |
+| View live logs | `tail -f server.log` |
+| Stop Server | `pkill -f 'python3 -m server.server'` |
+| Check port | `netstat -tlnp \| grep 10001` |
+| Reset database | `python3 reset_db.py` |
+
+### Troubleshooting
+
+**Connection Refused on Client:**
+- Check server is running: `ps aux | grep server`
+- Check firewall/port: `netstat -tlnp | grep 10001`
+- Verify config.py has correct hostname
+
+**Server Won't Start:**
+- Port already in use: `pkill -f server.server` then restart
+- Check logs: `cat server.log`
+
+**Game Client Can't Connect:**
+- Game server runs on school machine, clients connect via SERVER_HOST
+- Make sure game port (10002+) is not blocked
 
 ---
 
