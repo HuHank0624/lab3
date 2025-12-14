@@ -1,1 +1,17 @@
-{"rooms": []}
+{
+  "rooms": [
+    {
+      "room_id": "978c5179",
+      "room_name": "123",
+      "host": "1",
+      "game_id": "d333dc4771064bb99d60e8379ad03904",
+      "players": [
+        "1",
+        "2"
+      ],
+      "max_players": 2,
+      "status": "playing",
+      "game_port": 10000
+    }
+  ]
+}

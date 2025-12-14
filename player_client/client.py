@@ -4,7 +4,7 @@ import socket
 from .menu import PlayerMenu
 
 SERVER_HOST = "127.0.0.1"   # 若在 linux2 上跑 server + player，就填 localhost
-SERVER_PORT = 5555
+SERVER_PORT = 10001
 
 
 def main():

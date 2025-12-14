@@ -72,30 +72,50 @@ class LobbyClient:
     # ----- main lobby flow -----
 
     def lobby_menu(self) -> None:
+        page = 1
         while True:
-            print("\n=== Game Lobby ===")
-            print("1. View room list")
-            print("2. Create new room")
-            print("3. Join room")
-            print("4. Leave room")
-            print("5. Start game (host only)")
-            print("0. Back to main menu")
-            choice = input("> ").strip()
+            if page == 1:
+                print("\n=== Game Lobby (Page 1/2) ===")
+                print("1. View room list")
+                print("2. Create new room")
+                print("3. Join room")
+                print("4. Leave room")
+                print("n. Next page →")
+                print("0. Back to main menu")
+                choice = input("> ").strip().lower()
 
-            if choice == "0":
-                return
-            elif choice == "1":
-                self.show_rooms()
-            elif choice == "2":
-                self.create_room()
-            elif choice == "3":
-                self.join_room()
-            elif choice == "4":
-                self.leave_room()
-            elif choice == "5":
-                self.start_game()
-            else:
-                print("無效選項。")
+                if choice == "0":
+                    return
+                elif choice == "1":
+                    self.show_rooms()
+                elif choice == "2":
+                    self.create_room()
+                elif choice == "3":
+                    self.join_room()
+                elif choice == "4":
+                    self.leave_room()
+                elif choice == "n":
+                    page = 2
+                else:
+                    print("Invalid option.")
+            else:  # page == 2
+                print("\n=== Game Lobby (Page 2/2) ===")
+                print("5. Start game (host only)")
+                print("6. Launch game client (after host starts)")
+                print("p. ← Previous page")
+                print("0. Back to main menu")
+                choice = input("> ").strip().lower()
+
+                if choice == "0":
+                    return
+                elif choice == "5":
+                    self.start_game()
+                elif choice == "6":
+                    self.launch_game_client()
+                elif choice == "p":
+                    page = 1
+                else:
+                    print("Invalid option.")
 
     def show_rooms(self) -> None:
         rooms = self._fetch_rooms()
@@ -107,11 +127,13 @@ class LobbyClient:
             players = ", ".join(r.get("players", []))
             status = "waiting" if r['status'] == "waiting" else "in-game"
             print(
-                f"  [{r['room_id']}] {r['room_name']}\n"
-                f"    Game: {r['game_id'][:8]}... | Host: {r['host']}\n"
-                f"    Players ({len(r.get('players', []))}/{r['max_players']}): {players}\n"
-                f"    Status: {status}"
+                f"\n  Room ID: {r['room_id']}\n"
+                f"  Name: {r['room_name']}\n"
+                f"  Game: {r['game_id'][:8]}... | Host: {r['host']}\n"
+                f"  Players ({len(r.get('players', []))}/{r['max_players']}): {players}\n"
+                f"  Status: {status} | Port: {r.get('game_port', 'N/A')}"
             )
+        print()
 
     def create_room(self) -> None:
         game = self._choose_game()
@@ -210,6 +232,75 @@ class LobbyClient:
         game_id = room_info.get("game_id")
 
         print(f"✅ Game starting on port {game_port}")
+
+        # Find local game directory
+        game_dir = self._get_game_dir(game_id)
+        if not game_dir:
+            print("⚠ Game not downloaded, cannot launch client")
+            return
+
+        # Find client entry
+        entry = None
+        for root, dirs, files in os.walk(game_dir):
+            for f in files:
+                if "client" in f.lower() and f.endswith(".py"):
+                    entry = os.path.join(root, f)
+                    break
+            if entry:
+                break
+
+        if not entry:
+            print("⚠ Cannot find client entry file")
+            return
+
+        # Launch game client
+        cmd = [
+            sys.executable, entry,
+            "--host", "127.0.0.1",
+            "--port", str(game_port),
+            "--name", self.username
+        ]
+        print(f"🎮 Launching game: {' '.join(cmd)}")
+        
+        try:
+            subprocess.Popen(cmd)
+            print("✅ Game launched!")
+        except Exception as e:
+            print(f"❌ Launch failed: {e}")
+
+    def launch_game_client(self) -> None:
+        """For non-host players to launch game client after host starts."""
+        if self.current_room_id:
+            room_id = self.current_room_id
+            print(f"Using current room: {room_id}")
+        else:
+            room_id = input("Enter room_id: ").strip()
+
+        if not room_id:
+            return
+
+        # Get room info to check status and get port
+        send_json(self.sock, {"action": "get_room_info", "room_id": room_id})
+        resp = recv_json(self.sock)
+
+        if resp.get("status") != "ok":
+            print(f"❌ Failed: {resp.get('message', 'Unknown error')}")
+            return
+
+        room_info = resp.get("room")
+        if not room_info:
+            print("❌ Room info not found")
+            return
+
+        if room_info.get("status") != "playing":
+            print(f"⚠ Game not started yet. Status: {room_info.get('status')}")
+            print("  Wait for the host to start the game, then try again.")
+            return
+
+        game_port = room_info.get("game_port")
+        game_id = room_info.get("game_id")
+
+        print(f"✅ Game is running on port {game_port}")
 
         # Find local game directory
         game_dir = self._get_game_dir(game_id)

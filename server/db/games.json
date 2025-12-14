@@ -10,7 +10,13 @@
       "cli_entry": "gomoku_client.py",
       "gui_entry": "gomoku_server.py",
       "downloads": 2,
-      "reviews": []
+      "reviews": [
+        {
+          "username": "1",
+          "rating": 5,
+          "comment": "gggg"
+        }
+      ]
     }
   ]
 }

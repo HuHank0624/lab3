@@ -19,6 +19,9 @@ class LobbyManager:
     def list_rooms(self) -> List[Dict[str, Any]]:
         return self.datastore.list_rooms()
 
+    def get_room(self, room_id: str) -> Optional[Dict[str, Any]]:
+        return self.datastore.get_room(room_id)
+
     def create_room(
         self,
         host_username: str,
@@ -55,12 +58,14 @@ class LobbyManager:
         self.datastore.leave_room(room_id, username)
         return {"status": "ok"}
 
-    def start_game(self, room_id: str) -> Dict[str, Any]:
+    def start_game(self, room_id: str, username: str) -> Dict[str, Any]:
         room = self.datastore.get_room(room_id)
         if not room:
             return {"status": "error", "message": "Room not found"}
         if room["status"] != "waiting":
-            return {"status": "error", "message": "Already started"}
+            return {"status": "error", "message": "Game already started"}
+        if room.get("host") != username:
+            return {"status": "error", "message": "Only the host can start the game"}
 
         game = self.datastore.get_game(room["game_id"])
         if not game:
@@ -68,7 +73,7 @@ class LobbyManager:
 
         port = room["game_port"]
 
-        # 🟢 啟動遊戲伺服器
+        # Start game server
         ok = self.runtime.start_game_server(room_id, game, port)
         if not ok:
             return {"status": "error", "message": "Failed to launch game server"}

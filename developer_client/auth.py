@@ -21,7 +21,11 @@ class DeveloperAuth:
             "password": password
         })
         resp = recv_json(self.sock)
-        print("Server:", resp)
+
+        if resp and resp.get("status") == "ok":
+            print("✅ Registration successful! Please login.")
+        else:
+            print(f"❌ Registration failed: {resp.get('message', 'Unknown error')}")
 
     def login(self) -> bool:
         print("\n=== Developer Login ===")
@@ -35,9 +39,11 @@ class DeveloperAuth:
             "password": password
         })
         resp = recv_json(self.sock)
-        print("Server:", resp)
 
         if resp and resp.get("status") == "ok":
             self.username = username
+            print(f"✅ Login successful! Welcome {username}")
             return True
-        return False
+        else:
+            print(f"❌ Login failed: {resp.get('message', 'Unknown error')}")
+            return False

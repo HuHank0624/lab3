@@ -16,7 +16,7 @@ def log(*args) -> None:
 
 # Default configuration
 SERVER_HOST = "0.0.0.0"
-SERVER_PORT = 5555
+SERVER_PORT = 10001
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_DIR = os.path.join(BASE_DIR, "server", "db")

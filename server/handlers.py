@@ -62,6 +62,9 @@ class RequestHandlers:
             elif action == "list_rooms":
                 self._handle_list_rooms(sock)
 
+            elif action == "get_room_info":
+                self._handle_get_room_info_by_id(sock, msg)
+
             elif action == "create_room" and role == "player":
                 self._handle_create_room(sock, username, msg)
 
@@ -200,6 +203,17 @@ class RequestHandlers:
         rooms = self.lobby.list_rooms()
         send_ok(sock, rooms=rooms)
 
+    def _handle_get_room_info_by_id(self, sock, msg: Dict[str, Any]) -> None:
+        room_id = msg.get("room_id")
+        if not room_id:
+            send_error(sock, "room_id required")
+            return
+        room = self.lobby.get_room(room_id)
+        if not room:
+            send_error(sock, "Room not found")
+            return
+        send_ok(sock, room=room)
+
     def _handle_create_room(self, sock, username: str, msg: Dict[str, Any]) -> None:
         game_id = msg.get("game_id")
         room_name = msg.get("room_name", "Room")
@@ -251,7 +265,16 @@ class RequestHandlers:
             send_error(sock, "room_id required")
             return
 
-        resp = self.lobby.start_game(room_id)
+        # Check if user is the host
+        room = self.lobby.datastore.get_room(room_id)
+        if not room:
+            send_error(sock, "Room not found")
+            return
+        if room.get("host") != username:
+            send_error(sock, "Only the host can start the game")
+            return
+
+        resp = self.lobby.start_game(room_id, username)
         if resp["status"] == "ok":
             send_ok(sock, **resp)
         else:

@@ -49,8 +49,7 @@ class UploadSession:
 class GameManager:
     """Handle game metadata and upload sessions."""
 
-    # ✅ 改成預設從 10000 開始分配 port
-    def __init__(self, datastore: DataStore, base_port: int = 10000):
+    def __init__(self, datastore: DataStore, base_port: int = 10002):
         self.datastore = datastore
         self.uploads: Dict[str, UploadSession] = {}
         self.uploads_lock = threading.Lock()

@@ -3,7 +3,7 @@ import socket
 from .menu import DeveloperMenu
 
 SERVER_HOST = "127.0.0.1"   # or linux2.nycu.edu.tw (with ssh port forward)
-SERVER_PORT = 5555
+SERVER_PORT = 10001
 
 
 def main():
