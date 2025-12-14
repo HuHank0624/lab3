@@ -24,7 +24,17 @@ class AuthManager:
     ) -> Dict[str, Any]:
         if not self.datastore.validate_login(username, password, role):
             return {"status": "error", "message": "Invalid credentials"}
-        # Only one session per username is enforced by overwriting
+        
+        # Kick out old session if same user is already logged in
+        old_conn_id = None
+        for cid, sess in list(self.sessions.items()):
+            if sess["username"] == username and sess["role"] == role:
+                old_conn_id = cid
+                break
+        if old_conn_id is not None and old_conn_id != conn_id:
+            del self.sessions[old_conn_id]
+            log(f"Kicked old session for {username} (old conn_id={old_conn_id})")
+        
         self.sessions[conn_id] = {"username": username, "role": role}
         log(f"User logged in: {username} ({role}) conn_id={conn_id}")
         return {"status": "ok", "message": "Login successful", "username": username, "role": role}

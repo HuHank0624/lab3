@@ -7,17 +7,18 @@ from .utils import GAMES_ROOT
 
 class GameLibrary:
     """
-    管理本地遊戲庫：簡單以 games/ 底下資料夾代表一個已安裝遊戲。
-    資料夾命名約定：<game_id>_<name>/
+    Manage local game library: each user has their own games folder.
+    Path: games/<username>/<game_name>/
     """
 
     def __init__(self, username: str):
         self.username = username
+        self.user_games_dir = GAMES_ROOT / username
 
     def list_installed_games(self) -> List[Path]:
-        if not GAMES_ROOT.exists():
+        if not self.user_games_dir.exists():
             return []
-        return [p for p in GAMES_ROOT.iterdir() if p.is_dir()]
+        return [p for p in self.user_games_dir.iterdir() if p.is_dir()]
 
     def show_library(self) -> None:
         print("\n=== My Game Library ===")

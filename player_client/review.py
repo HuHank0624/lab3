@@ -14,11 +14,11 @@ class ReviewClient:
         print(f"Game: {game['name']} (id={game['game_id'][:8]}...)")
         rating_str = input("Enter rating (1-5): ").strip()
         if not rating_str.isdigit():
-            print("❌ Rating must be a number")
+            print("[!] Rating must be a number")
             return
         rating = int(rating_str)
         if rating < 1 or rating > 5:
-            print("❌ Rating must be between 1 and 5")
+            print("[!] Rating must be between 1 and 5")
             return
         comment = input("Enter comment (optional): ").strip()
 
@@ -30,15 +30,15 @@ class ReviewClient:
         })
         resp = recv_json(self.sock)
         if resp and resp.get("status") == "ok":
-            print("✅ Review submitted successfully!")
+            print("[OK] Review submitted successfully!")
         else:
-            print(f"❌ Failed: {resp.get('message', 'Unknown error')}")
+            print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
 
     def list_games_and_review(self) -> None:
         send_json(self.sock, {"action": "list_games"})
         resp = recv_json(self.sock)
         if not resp or resp.get("status") != "ok":
-            print(f"❌ Failed to fetch games: {resp.get('message', 'Unknown error')}")
+            print(f"[!] Failed to fetch games: {resp.get('message', 'Unknown error')}")
             return
         games = resp.get("games", [])
         if not games:

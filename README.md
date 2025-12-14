@@ -1,202 +1,386 @@
 # Game Lobby & Store Platform
 
-A Steam-like multiplayer game platform for Network Programming course (Lab 3).
+A multiplayer game platform with lobby, store, developer upload, and game runtime support.
 
-## Project Structure
+---
+
+## 📋 Requirements Checklist
+
+### Account System ✅
+- [x] Developer and Player accounts are **separate** (different registration)
+- [x] Simple username + password registration
+- [x] No duplicate usernames (checked during registration)
+- [x] Login validation (password check)
+- [x] One session per account (new login overwrites old session)
+
+### Developer Platform ✅
+- [x] **D1: Upload new game** - Developers can upload games with name, version, description
+- [x] **D2: Update game** - Re-upload with new version number
+- [x] **D3: Delete/Unlist game** - Remove game from store
+- [x] Developer can only manage their own games
+- [x] Game template system (`create_game_template.py`)
+- [x] Developer games stored in `developer_client/games/`
+
+### Player Platform ✅
+- [x] **P1: Browse store** - View game list, details, ratings, reviews
+- [x] **P2: Download games** - Download to per-user folder (`player_client/games/<username>/`)
+- [x] **P3: Create room & Start game** - Host-only start, auto-launch game server
+- [x] **P4: Rate & Review** - 1-5 star rating with comments
+- [x] Per-user game folders (simulates multiple players on same machine)
+- [x] One room per player limit
+
+### Server Features ✅
+- [x] Data persists after restart (JSON files in `server/db/`)
+- [x] Game file storage (`server/storage/uploads/`)
+- [x] Game runtime extraction (`server/storage/runtime/`)
+- [x] Room management (create, join, leave, close)
+- [x] Game server auto-launch
+
+### Menu-Driven Interface ✅
+- [x] Clear numbered options at each step
+- [x] Pagination for long menus (max 5 options per page)
+- [x] No command-line knowledge required
+
+---
+
+## 🚀 Quick Start (Local Testing)
+
+### 1. Start Server
+```bash
+# Terminal 1: Server
+make reset  # Reset database (optional, for clean start)
+make server
+```
+
+### 2. Start Developer Client (Upload a Game)
+```bash
+# Terminal 2: Developer
+make dev
+```
+
+### 3. Start Player Clients (Multiple Players)
+```bash
+# Terminal 3: Player 1
+make player
+
+# Terminal 4: Player 2 (separate terminal)
+make player
+```
+
+---
+
+## 🧪 Complete Test Routine
+
+### Phase 1: Developer Workflow
+
+#### 1.1 Developer Registration & Login
+```
+Developer Menu:
+1. Register → username: dev1, password: 123
+2. Login → dev1 / 123
+```
+
+#### 1.2 Upload Game (Use Case D1)
+```
+Developer Dashboard:
+1. Upload new game
+   - Select from available games (e.g., gomoku)
+   - Fill in:
+     * Game Name: Gomoku
+     * Version: 1.0.0
+     * Description: Two-player Gomoku game
+     * Server Entry: gomoku_server.py
+     * Client Entry: gomoku_client.py
+   - Confirm upload
+```
+
+#### 1.3 Verify Upload
+```
+Developer Dashboard:
+3. List my games → Should see "Gomoku" with download count 0
+```
+
+#### 1.4 Update Game (Use Case D2)
+```
+Developer Dashboard:
+2. Update existing game
+   - Select game
+   - Re-upload with Version: 1.0.1
+```
+
+---
+
+### Phase 2: Player 1 Workflow
+
+#### 2.1 Player 1 Registration & Login
+```
+Player Menu:
+1. Register → username: player1, password: 123
+2. Login → player1 / 123
+```
+
+#### 2.2 Browse Store (Use Case P1)
+```
+Player Menu (Logged In):
+1. Browse Game Store
+   - See list of games with ratings
+   v. View game details
+   - Select game → See description, reviews, developer info
+```
+
+#### 2.3 Download Game (Use Case P2)
+```
+Game Store:
+d. Download game
+   - Select game number
+   - Wait for download complete
+   - Game extracted to: player_client/games/player1/Gomoku/
+```
+
+#### 2.4 Check Library
+```
+Player Menu:
+2. My Game Library
+   - Should see downloaded games
+```
+
+#### 2.5 Create Room (Use Case P3)
+```
+Player Menu:
+3. Enter Game Lobby
+   1. View room list → (empty initially)
+   2. Create new room
+      - Select game (Gomoku)
+      - Room name: "Player1's Room"
+      - Max players: 2
+   → Room created! Note the Room ID and Port
+```
+
+---
+
+### Phase 3: Player 2 Workflow
+
+#### 3.1 Player 2 Setup (New Terminal)
+```
+Player Menu:
+1. Register → username: player2, password: 123
+2. Login → player2 / 123
+```
+
+#### 3.2 Download Same Game
+```
+Browse Game Store → Download Gomoku
+→ Extracted to: player_client/games/player2/Gomoku/
+```
+
+#### 3.3 Join Room
+```
+Enter Game Lobby:
+1. View room list → See "Player1's Room"
+3. Join room → Enter room_id
+```
+
+---
+
+### Phase 4: Game Play
+
+#### 4.1 Host (Player 1) Starts Game
+```
+Game Lobby (page 2):
+5. Start game (host only)
+   → Game starting on port XXXXX
+   → Game server launched
+   → Game client launched for host
+```
+
+#### 4.2 Guest (Player 2) Joins Game
+```
+Game Lobby (page 2):
+6. Launch game client
+   → Game client connects to running server
+```
+
+#### 4.3 Play the Game
+- Both players should now be in the game
+- Play until game ends
+
+#### 4.4 Close Room (Host)
+```
+Game Lobby (page 2):
+7. Close room (host only)
+   → Room deleted, game server stopped
+```
+
+---
+
+### Phase 5: Review System (Use Case P4)
+
+#### 5.1 Rate & Review
+```
+Player Menu:
+4. Rate & Review Games
+   - Select game
+   - Enter rating: 5
+   - Enter comment: "Great game!"
+```
+
+#### 5.2 Verify Review
+```
+Browse Game Store:
+v. View game details
+   → Should show average rating and reviews
+```
+
+---
+
+### Phase 6: Developer Delete Game (Use Case D3)
+
+```
+Developer Dashboard:
+4. Delete (unlist) game
+   - Select game
+   - Type "DELETE" to confirm
+   → Game removed from store
+```
+
+---
+
+## ⚠️ Error Scenarios to Test
+
+### Account Errors
+1. **Duplicate Registration**: Register with existing username → "Username already exists"
+2. **Wrong Password**: Login with wrong password → "Invalid credentials"
+3. **Not Logged In**: Try to create room without login → "Not logged in"
+
+### Game Management Errors
+1. **Download Non-Existent Game**: Game deleted while downloading → "Game not found"
+2. **Create Room Without Download**: Try to create room for undownloaded game → "Please download first"
+3. **Start Game as Non-Host**: Non-host tries to start → "Only the host can start"
+4. **Double Room Creation**: Try to create second room → "You already have a room"
+
+### Network Errors
+1. **Server Down**: Start client without server → "Connection refused"
+
+---
+
+## 📁 Project Structure
 
 ```
 lab3/
-├── server/                 # Backend Server
-│   ├── server.py          # Main server entry
-│   ├── handlers.py        # Request handlers
-│   ├── data.py            # JSON database layer
-│   ├── lobby_manager.py   # Room management
-│   ├── game_manager.py    # Game uploads & ports
-│   ├── game_runtime.py    # Game server launcher
-│   └── db/                # Database files
-│       ├── users.json
-│       ├── games.json
-│       └── rooms.json
+├── config.py                 # Server host/port configuration
+├── Makefile                  # Build/run commands
+├── server/
+│   ├── server.py            # Main server entry
+│   ├── handlers.py          # Request dispatcher
+│   ├── auth.py              # Authentication manager
+│   ├── data.py              # JSON database layer
+│   ├── game_manager.py      # Game upload/download
+│   ├── lobby_manager.py     # Room management
+│   ├── game_runtime.py      # Game server launcher
+│   ├── db/
+│   │   ├── users.json       # User accounts
+│   │   ├── games.json       # Game metadata
+│   │   └── rooms.json       # Active rooms
+│   └── storage/
+│       ├── uploads/         # Uploaded game ZIPs
+│       └── runtime/         # Extracted games for server
 │
-├── developer_client/       # Developer Client
-│   ├── client.py          # Entry point
-│   ├── auth.py            # Registration/Login
-│   ├── game_upload.py     # Upload games
-│   ├── game_manage.py     # Manage uploaded games
-│   ├── games/             # Local game development folder
-│   │   └── gomoku/        # Example: Gomoku game
-│   ├── template/          # Game templates
-│   │   ├── game_server_template.py
-│   │   └── game_client_template.py
-│   └── create_game_template.py  # Create new game project
+├── developer_client/
+│   ├── client.py            # Developer client entry
+│   ├── menu.py              # Developer menus
+│   ├── auth.py              # Developer authentication
+│   ├── game_upload.py       # Game upload logic
+│   ├── game_manage.py       # Update/delete games
+│   ├── games/               # Developer's local games
+│   │   └── gomoku/          # Example game
+│   ├── template/            # Game templates
+│   └── create_game_template.py
 │
-├── player_client/          # Player Client
-│   ├── client.py          # Entry point
-│   ├── auth.py            # Registration/Login
-│   ├── store.py           # Browse & download games
-│   ├── lobby.py           # Game rooms & matchmaking
-│   ├── library.py         # View downloaded games
-│   ├── review.py          # Rate & review games
-│   ├── downloads/         # Downloaded zip files (per user)
-│   └── games/             # Extracted games (per user)
-│       └── <username>/    # Each player has own folder
-│           └── <game_name>/
+├── player_client/
+│   ├── client.py            # Player client entry
+│   ├── menu.py              # Player menus
+│   ├── auth.py              # Player authentication
+│   ├── store.py             # Browse & download games
+│   ├── lobby.py             # Room management & game launch
+│   ├── library.py           # Local game library
+│   ├── review.py            # Rating & reviews
+│   ├── downloads/           # Downloaded ZIPs (per user)
+│   └── games/               # Extracted games (per user)
+│       ├── player1/
+│       │   └── Gomoku/
+│       └── player2/
+│           └── Gomoku/
 │
-├── utils/                  # Shared utilities
-│   ├── protocol.py        # JSON protocol (send/recv)
-│   └── file_transfer.py   # Chunked file transfer
-│
-├── start_server.bat       # Quick start server
-├── start_developer.bat    # Quick start developer client
-├── start_player.bat       # Quick start player client
-└── reset_db.py            # Reset database
+└── utils/
+    ├── protocol.py          # JSON protocol helpers
+    └── file_transfer.py     # Chunked file transfer
 ```
 
-## Quick Start
+---
 
-### 1. Start the Server
+## 🔧 Configuration
+
+Edit `config.py` to change server address:
+
+```python
+# For local testing:
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 10001
+
+# For school server deployment:
+# SERVER_HOST = "linux1.cs.nycu.edu.tw"
+# SERVER_PORT = 10001
+```
+
+---
+
+## 🖥️ School Server Deployment
+
+### On School Server (SSH)
 ```bash
-python -m server.server
-# Or double-click: start_server.bat
+ssh user@linux1.cs.nycu.edu.tw
+cd lab3
+make reset          # Clean start
+make server-bg      # Run server in background
 ```
-Server listens on port **10001**.
 
-### 2. Start Developer Client
+### On TA's Machine
 ```bash
-python -m developer_client.client
-# Or double-click: start_developer.bat
+# Edit config.py:
+SERVER_HOST = "linux1.cs.nycu.edu.tw"
+
+make dev    # Developer client
+make player # Player client
 ```
 
-### 3. Start Player Client
+### Stop Server
 ```bash
-python -m player_client.client
-# Or double-click: start_player.bat
+pkill -f 'python3 -m server.server'
 ```
 
-## Configuration
+---
 
-### Change Server IP/Port
+## 📝 Notes
 
-Edit these files to change connection settings:
+### Per-User Folders
+Each player has separate download/game folders:
+- `player_client/downloads/<username>/` - Downloaded ZIPs
+- `player_client/games/<username>/` - Extracted games
 
-| File | Variable |
-|------|----------|
-| `server/utils.py` | `SERVER_PORT = 10001` |
-| `player_client/client.py` | `SERVER_HOST`, `SERVER_PORT` |
-| `developer_client/client.py` | `SERVER_HOST`, `SERVER_PORT` |
+This simulates multiple players on different machines during demo.
 
-### Ports Used
-- **10001**: Main server
-- **10002+**: Game servers (auto-allocated)
-
-## Developer Workflow
-
-### Creating a New Game
-
-1. Use the template generator:
-   ```bash
-   cd developer_client
-   python create_game_template.py my_awesome_game
-   ```
-
-2. This creates:
-   ```
-   developer_client/games/my_awesome_game/
-   ├── my_awesome_game_server.py
-   ├── my_awesome_game_client.py
-   └── README.md
-   ```
-
-3. Customize the game logic in the server and client files.
-
-4. Test locally:
-   ```bash
-   # Terminal 1: Start server
-   python my_awesome_game_server.py --port 12345
-   
-   # Terminal 2: Start client 1
-   python my_awesome_game_client.py --host 127.0.0.1 --port 12345 --name Player1
-   
-   # Terminal 3: Start client 2
-   python my_awesome_game_client.py --host 127.0.0.1 --port 12345 --name Player2
-   ```
-
-5. Upload via Developer Client.
-
-### Uploading a Game
-
-1. Start Developer Client
-2. Register/Login as developer
-3. Select "Upload new game"
-4. Select game folder from `developer_client/games/`
-5. Enter game name, description, version
-
-## Player Workflow
-
-### Download & Play
-
-1. Start Player Client
-2. Register/Login as player
-3. Go to "Game Store" -> Browse & Download games
-4. Go to "Game Lobby" -> Create or Join room
-5. Host: "Start game" launches server + client
-6. Guest: "Launch game client" after host starts
-7. After game: Host closes room
-
-### Per-Player Game Storage
-
-Each player has their own game folder:
-```
-player_client/games/<username>/<game_name>/
-```
-
-This simulates different players on different computers, allowing:
-- Different players to have different game versions
-- Testing version update scenarios
-
-## Key Features
-
-### Room Restrictions
-- Each player can only host **one room at a time**
-- Must close existing room before creating new one
-
-### Version Updates
-- When developer uploads new version, old version is replaced
-- Players can re-download to get latest version
-- Downloaded games show version in `game_info.json`
-
-## Database Reset
-
-To reset all data:
+### Game Template
+Create new games using the template system:
 ```bash
-python reset_db.py
+cd developer_client
+python create_game_template.py my_new_game
 ```
 
-Then restart the server.
+This creates `developer_client/games/my_new_game/` with:
+- `my_new_game_server.py`
+- `my_new_game_client.py`
 
-## Demo Checklist
-
-1. [ ] Server running on Linux machine
-2. [ ] Developer registers, uploads Gomoku game
-3. [ ] Player 1 registers, downloads game, creates room
-4. [ ] Player 2 registers, downloads game, joins room
-5. [ ] Player 1 (host) starts game
-6. [ ] Player 2 launches game client
-7. [ ] Both players play the game
-8. [ ] After game, host closes room
-9. [ ] Players can rate/review the game
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Connection refused | Make sure server is running |
-| "You already have a room" | Close existing room first |
-| Game not launching | Make sure game is downloaded |
-| Room stuck in "playing" | Host should close room |
-| Port already in use | Restart server or change port |
-
-## Dependencies
-
-- Python 3.10+
-- No external dependencies (stdlib only)
+### Version Management
+- Games are identified by `game_id`
+- Re-uploading updates the version
+- Players can re-download to get the latest version

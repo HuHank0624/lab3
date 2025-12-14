@@ -23,14 +23,33 @@ def main():
         sock.connect((SERVER_HOST, SERVER_PORT))
         print(f"Connected to {SERVER_HOST}:{SERVER_PORT}")
     except ConnectionRefusedError:
-        print(f"Failed to connect to {SERVER_HOST}:{SERVER_PORT}")
-        print("Make sure the server is running.")
+        print(f"[!] Failed to connect to {SERVER_HOST}:{SERVER_PORT}")
+        print("   Make sure the server is running: make server")
+        return
+    except socket.gaierror:
+        print(f"[!] Cannot resolve hostname: {SERVER_HOST}")
+        print("   Check your network connection and server address.")
+        return
+    except OSError as e:
+        print(f"[!] Connection error: {e}")
         return
 
-    menu = DeveloperMenu(sock)
-    menu.run()
-
-    sock.close()
+    try:
+        menu = DeveloperMenu(sock)
+        menu.run()
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user. Goodbye!")
+    except BrokenPipeError:
+        print("\n[!] Lost connection to server.")
+    except ConnectionResetError:
+        print("\n[!] Connection reset by server.")
+    except Exception as e:
+        print(f"\n[!] Unexpected error: {e}")
+    finally:
+        try:
+            sock.close()
+        except:
+            pass
 
 
 if __name__ == "__main__":

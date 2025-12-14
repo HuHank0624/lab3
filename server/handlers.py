@@ -74,6 +74,9 @@ class RequestHandlers:
             elif action == "leave_room" and role == "player":
                 self._handle_leave_room(sock, username, msg)
 
+            elif action == "close_room" and role == "player":
+                self._handle_close_room(sock, username, msg)
+
             elif action == "start_game" and role == "player":
                 self._handle_start_game(sock, username, msg)
 

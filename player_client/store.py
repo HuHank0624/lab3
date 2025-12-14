@@ -23,7 +23,7 @@ class GameStoreClient:
         send_json(self.sock, {"action": "list_games"})
         resp = recv_json(self.sock)
         if not resp or resp.get("status") != "ok":
-            print("❌ Failed to fetch game list:", resp.get("message", "Unknown error"))
+            print("[!] Failed to fetch game list:", resp.get("message", "Unknown error"))
             self.games = []
             return
         self.games = resp.get("games", [])
@@ -39,7 +39,7 @@ class GameStoreClient:
             return
         for idx, g in enumerate(self.games, start=1):
             avg_rating = self._calc_avg_rating(g)
-            rating_str = f"★{avg_rating:.1f}" if avg_rating else "No ratings"
+            rating_str = f"*{avg_rating:.1f}" if avg_rating else "No ratings"
             print(
                 f"{idx}. {g['name']} (id={g['game_id'][:8]}...) "
                 f"by {g['developer']} v{g['version']} [{rating_str}]"
@@ -76,14 +76,14 @@ class GameStoreClient:
         reviews = game.get("reviews", [])
         avg_rating = self._calc_avg_rating(game)
         if avg_rating:
-            print(f"Rating: ★{avg_rating:.1f} ({len(reviews)} reviews)")
+            print(f"Rating: *{avg_rating:.1f} ({len(reviews)} reviews)")
         else:
             print("Rating: No ratings yet")
         
         if reviews:
             print("\n--- Player Reviews ---")
             for r in reviews[-5:]:  # Show last 5 reviews
-                print(f"  {r['username']}: ★{r['rating']} - {r.get('comment', '')}")
+                print(f"  {r['username']}: *{r['rating']} - {r.get('comment', '')}")
 
     # -----------------------------
     # Main store flow

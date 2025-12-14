@@ -11,5 +11,5 @@
 # For local testing:
 #   - 127.0.0.1 (localhost)
 
-SERVER_HOST = "127.0.0.1"
+SERVER_HOST = "linux1.cs.nycu.edu.tw"
 SERVER_PORT = 10001
