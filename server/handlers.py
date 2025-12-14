@@ -77,6 +77,15 @@ class RequestHandlers:
             elif action == "download_game" and role == "player":
                 self._handle_download_game(sock, username, msg)
 
+            elif action == "get_game_info":
+                self._handle_get_game_info(sock, msg)
+
+            elif action == "my_games" and role == "developer":
+                self._handle_my_games(sock, username)
+
+            elif action == "delete_game" and role == "developer":
+                self._handle_delete_game(sock, username, msg)
+
             else:
                 send_error(sock, f"Unknown or unauthorized action: {action}")
 
@@ -90,6 +99,8 @@ class RequestHandlers:
     # ---- basic auth ----
 
     def _handle_register(self, sock, msg: Dict[str, Any]) -> None:
+        log("🔥 USING NEW REGISTER HANDLER 🔥")
+
         username = msg.get("username", "").strip()
         password = msg.get("password", "")
         role = msg.get("role", "")
@@ -97,15 +108,17 @@ class RequestHandlers:
         if role not in ("player", "developer"):
             send_error(sock, "Invalid role")
             return
+
         if not username or not password:
             send_error(sock, "Username and password required")
             return
 
-        resp = self.auth.register(username, password, role)
-        if resp["status"] == "ok":
-            send_ok(sock, message=resp["message"])
+        ok, message = self.auth.register(username, password, role)
+
+        if ok:
+            send_ok(sock, message=message)
         else:
-            send_error(sock, resp["message"])
+            send_error(sock, message)
 
     def _handle_login(self, sock, conn_id: int, msg: Dict[str, Any]) -> None:
         username = msg.get("username", "").strip()
@@ -201,12 +214,6 @@ class RequestHandlers:
             send_error(sock, "Game not found")
             return
 
-        user = self.datastore.get_user(username)
-        owned = (user or {}).get("owned_games", [])
-        if game_id not in owned:
-            send_error(sock, "You must download the game before creating room")
-            return
-
         port = self.games.allocate_game_port()
         resp = self.lobby.create_room(
             host_username=username,
@@ -263,19 +270,15 @@ class RequestHandlers:
             send_error(sock, "Game not found")
             return
 
-        # 權限檢查（你原本就有）
-        user = self.datastore.get_user(username)
-        owned = (user or {}).get("owned_games", [])
-        if game_id not in owned:
-            send_error(sock, "You must download the game first")
-            return
-
         zip_path = game["file_path"]
         if not os.path.exists(zip_path):
             send_error(sock, "Game file missing on server")
             return
 
-        # 🔥 真正開始傳檔
+        # Update ownership BEFORE sending file
+        self.datastore.increment_download(username, game_id)
+
+        # Send file in chunks
         with open(zip_path, "rb") as f:
             while True:
                 chunk = f.read(4096)
@@ -291,3 +294,49 @@ class RequestHandlers:
                     "data": encode_chunk(chunk),
                     "eof": False
                 })
+
+    # ---- game info ----
+
+    def _handle_get_game_info(self, sock, msg: Dict[str, Any]) -> None:
+        game_id = msg.get("game_id")
+        if not game_id:
+            send_error(sock, "game_id required")
+            return
+
+        game = self.games.get_game(game_id)
+        if not game:
+            send_error(sock, "Game not found")
+            return
+
+        # Return full game info including reviews
+        send_ok(sock, game=game)
+
+    # ---- developer: my_games ----
+
+    def _handle_my_games(self, sock, username: str) -> None:
+        games = self.games.list_games()
+        my_games = [g for g in games if g.get("developer") == username]
+        send_ok(sock, games=my_games)
+
+    # ---- developer: delete_game ----
+
+    def _handle_delete_game(self, sock, username: str, msg: Dict[str, Any]) -> None:
+        game_id = msg.get("game_id")
+        if not game_id:
+            send_error(sock, "game_id required")
+            return
+
+        game = self.games.get_game(game_id)
+        if not game:
+            send_error(sock, "Game not found")
+            return
+
+        if game.get("developer") != username:
+            send_error(sock, "You can only delete your own games")
+            return
+
+        ok = self.datastore.delete_game(game_id)
+        if ok:
+            send_ok(sock, message="Game deleted successfully")
+        else:
+            send_error(sock, "Failed to delete game")

@@ -13,11 +13,11 @@ class AuthManager:
         # Maps conn_id (id(sock)) -> session info
         self.sessions: Dict[int, Dict[str, Any]] = {}
 
-    def register(self, username: str, password: str, role: str) -> Dict[str, Any]:
+    def register(self, username: str, password: str, role: str) -> tuple[bool, str]:
         ok = self.datastore.register_user(username, password, role)
         if not ok:
-            return {"status": "error", "message": "Username already exists"}
-        return {"status": "ok", "message": "Registration successful"}
+            return False, "Username already exists"
+        return True, "Registration successful"
 
     def login(
         self, conn_id: int, username: str, password: str, role: str

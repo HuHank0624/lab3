@@ -20,10 +20,10 @@ class GameLibrary:
         return [p for p in GAMES_ROOT.iterdir() if p.is_dir()]
 
     def show_library(self) -> None:
-        print("\n=== 我的遊戲庫 ===")
+        print("\n=== My Game Library ===")
         games = self.list_installed_games()
         if not games:
-            print("(尚未安裝任何遊戲)")
+            print("(No games installed)")
             return
         for idx, p in enumerate(games, start=1):
-            print(f"{idx}. {p.name}  (路徑: {p})")
+            print(f"{idx}. {p.name}  (path: {p})")

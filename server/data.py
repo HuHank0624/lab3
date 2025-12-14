@@ -26,7 +26,7 @@ class JsonTable:
     def __init__(self, path: str, default_root: Dict[str, Any]):
         self.path = path
         self.default_root = default_root
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # Use RLock to allow reentrant locking
         _ensure_file(path, default_root)
         self._data = self._load()
 
@@ -195,6 +195,31 @@ class DataStore:
                 {"username": username, "rating": rating, "comment": comment}
             )
             self.games.save()
+        return True
+
+    def delete_game(self, game_id: str) -> bool:
+        """Delete a game from the database and remove from developer's uploaded_games."""
+        with self.games.with_lock(), self.users.with_lock():
+            games = self.games.data["games"]
+            game = next((g for g in games if g["game_id"] == game_id), None)
+            if not game:
+                return False
+            
+            # Remove from games list
+            games.remove(game)
+            
+            # Remove from developer's uploaded_games
+            developer = game.get("developer")
+            if developer:
+                for u in self.users.data["users"]:
+                    if u["username"] == developer:
+                        uploaded = u.get("uploaded_games", [])
+                        if game_id in uploaded:
+                            uploaded.remove(game_id)
+                        break
+            
+            self.games.save()
+            self.users.save()
         return True
 
     # ----- Rooms -----

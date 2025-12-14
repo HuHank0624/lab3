@@ -10,14 +10,17 @@ class ReviewClient:
         self.username = username
 
     def submit_review(self, game: Dict[str, Any]) -> None:
-        print("\n=== 評分與留言 ===")
-        print(f"遊戲：{game['name']} (id={game['game_id']})")
-        rating_str = input("請輸入評分 (1~5)：").strip()
+        print("\n=== Rate & Review ===")
+        print(f"Game: {game['name']} (id={game['game_id'][:8]}...)")
+        rating_str = input("Enter rating (1-5): ").strip()
         if not rating_str.isdigit():
-            print("❌ 評分必須是數字")
+            print("❌ Rating must be a number")
             return
         rating = int(rating_str)
-        comment = input("請輸入評論（可留空）：").strip()
+        if rating < 1 or rating > 5:
+            print("❌ Rating must be between 1 and 5")
+            return
+        comment = input("Enter comment (optional): ").strip()
 
         send_json(self.sock, {
             "action": "submit_review",
@@ -26,25 +29,27 @@ class ReviewClient:
             "comment": comment,
         })
         resp = recv_json(self.sock)
-        print("伺服器:", resp)
+        if resp and resp.get("status") == "ok":
+            print("✅ Review submitted successfully!")
+        else:
+            print(f"❌ Failed: {resp.get('message', 'Unknown error')}")
 
     def list_games_and_review(self) -> None:
-        # 先抓遊戲列表讓玩家選擇要評分哪一款
         send_json(self.sock, {"action": "list_games"})
         resp = recv_json(self.sock)
         if not resp or resp.get("status") != "ok":
-            print("❌ 無法取得遊戲列表:", resp)
+            print(f"❌ Failed to fetch games: {resp.get('message', 'Unknown error')}")
             return
         games = resp.get("games", [])
         if not games:
-            print("(目前沒有遊戲)")
+            print("(No games available)")
             return
 
-        print("\n=== 選擇要評分的遊戲 ===")
+        print("\n=== Select Game to Review ===")
         for idx, g in enumerate(games, start=1):
-            print(f"{idx}. {g['name']} (id={g['game_id']}) by {g['developer']}")
+            print(f"{idx}. {g['name']} (id={g['game_id'][:8]}...) by {g['developer']}")
 
-        choice = input("輸入編號（或 0 返回）：").strip()
+        choice = input("Enter number (or 0 to cancel): ").strip()
         if not choice.isdigit():
             return
         idx = int(choice)

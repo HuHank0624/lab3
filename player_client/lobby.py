@@ -14,6 +14,7 @@ class LobbyClient:
         self.sock = sock
         self.username = username
         self.library = GameLibrary(username)
+        self.current_room_id: Optional[str] = None
 
     # ----- helper -----
 
@@ -33,47 +34,52 @@ class LobbyClient:
             return []
         return resp.get("games", [])
 
-    def _choose_game_from_owned(self) -> Optional[Dict[str, Any]]:
-        """顯示 server 遊戲列表，但只列出已安裝的 game_id。"""
+    def _choose_game(self) -> Optional[Dict[str, Any]]:
+        """Show all games and let user choose one."""
         games = self._fetch_games()
-        installed_dirs = self.library.list_installed_games()
-        installed_ids = set()
-        for d in installed_dirs:
-            # 資料夾名: <game_id>_<name>
-            parts = d.name.split("_", 1)
-            if parts:
-                installed_ids.add(parts[0])
-
-        owned_games = [g for g in games if g["game_id"] in installed_ids]
-        if not owned_games:
-            print("⚠ 你目前沒有安裝任何遊戲，請先到商城下載。")
+        if not games:
+            print("⚠ No games available in store.")
             return None
 
-        print("\n=== 以已安裝遊戲建立房間 ===")
-        for idx, g in enumerate(owned_games, start=1):
-            print(f"{idx}. {g['name']} (id={g['game_id']}) v{g['version']}")
+        print("\n=== Select a Game ===")
+        for idx, g in enumerate(games, start=1):
+            print(f"{idx}. {g['name']} (id={g['game_id'][:8]}...) v{g['version']}")
 
-        choice = input("選擇遊戲（或 0 返回）：").strip()
+        choice = input("Select game (or 0 to cancel): ").strip()
         if not choice.isdigit():
             return None
         idx = int(choice)
         if idx == 0:
             return None
-        if 1 <= idx <= len(owned_games):
-            return owned_games[idx - 1]
+        if 1 <= idx <= len(games):
+            return games[idx - 1]
+        return None
+
+    def _is_game_installed(self, game_id: str) -> bool:
+        """Check if game is installed locally."""
+        for d in GAMES_ROOT.iterdir():
+            if d.name.startswith(game_id):
+                return True
+        return False
+
+    def _get_game_dir(self, game_id: str) -> Optional[str]:
+        """Get game directory if installed."""
+        for d in GAMES_ROOT.iterdir():
+            if d.name.startswith(game_id):
+                return str(d)
         return None
 
     # ----- main lobby flow -----
 
     def lobby_menu(self) -> None:
         while True:
-            print("\n=== 遊戲大廳 ===")
-            print("1. 查看房間列表")
-            print("2. 建立新房間")
-            print("3. 加入房間")
-            print("4. 離開房間（需輸入房間ID）")
-            print("5. 房主開始遊戲（需輸入房間ID）")
-            print("0. 返回玩家主選單")
+            print("\n=== Game Lobby ===")
+            print("1. View room list")
+            print("2. Create new room")
+            print("3. Join room")
+            print("4. Leave room")
+            print("5. Start game (host only)")
+            print("0. Back to main menu")
             choice = input("> ").strip()
 
             if choice == "0":
@@ -93,23 +99,32 @@ class LobbyClient:
 
     def show_rooms(self) -> None:
         rooms = self._fetch_rooms()
-        print("\n=== 房間列表 ===")
+        print("\n=== Room List ===")
         if not rooms:
-            print("(目前沒有房間)")
+            print("(No rooms available)")
             return
         for r in rooms:
+            players = ", ".join(r.get("players", []))
+            status = "waiting" if r['status'] == "waiting" else "in-game"
             print(
-                f"- room_id={r['room_id']} | {r['room_name']} | game={r['game_id']}"
-                f" | host={r['host']} | players={len(r['players'])}/{r['max_players']} | "
-                f"status={r['status']} | game_port={r['game_port']}"
+                f"  [{r['room_id']}] {r['room_name']}\n"
+                f"    Game: {r['game_id'][:8]}... | Host: {r['host']}\n"
+                f"    Players ({len(r.get('players', []))}/{r['max_players']}): {players}\n"
+                f"    Status: {status}"
             )
 
     def create_room(self) -> None:
-        game = self._choose_game_from_owned()
+        game = self._choose_game()
         if not game:
             return
-        room_name = input("房間名稱：").strip() or "Room"
-        max_players_str = input("最大人數（預設 2）：").strip()
+
+        # Check if game is installed
+        if not self._is_game_installed(game["game_id"]):
+            print(f"⚠ Game not downloaded. Please download '{game['name']}' from the store first.")
+            return
+
+        room_name = input("Room name: ").strip() or "Room"
+        max_players_str = input("Max players (default 2): ").strip()
         max_players = int(max_players_str) if max_players_str.isdigit() else 2
 
         send_json(self.sock, {
@@ -119,60 +134,115 @@ class LobbyClient:
             "max_players": max_players,
         })
         resp = recv_json(self.sock)
-        print("伺服器:", resp)
+        
+        if resp and resp.get("status") == "ok":
+            self.current_room_id = resp.get("room_id")
+            print(f"✅ Room created! Room ID: {self.current_room_id}")
+            print(f"   Game port: {resp.get('game_port')}")
+        else:
+            print(f"❌ Failed to create room: {resp.get('message', 'Unknown error')}")
 
     def join_room(self) -> None:
-        room_id = input("輸入要加入的 room_id：").strip()
+        self.show_rooms()
+        room_id = input("\nEnter room_id to join: ").strip()
+        if not room_id:
+            return
+
         send_json(self.sock, {
             "action": "join_room",
             "room_id": room_id,
         })
         resp = recv_json(self.sock)
-        print("伺服器:", resp)
+        
+        if resp and resp.get("status") == "ok":
+            self.current_room_id = room_id
+            room_info = resp.get("room_info", {})
+            game_id = room_info.get("game_id")
+            print(f"✅ Successfully joined room {room_id}")
+            
+            # Check if game is installed
+            if game_id and not self._is_game_installed(game_id):
+                print(f"⚠ Note: Game not downloaded yet. Please download before game starts.")
+        else:
+            print(f"❌ Failed to join: {resp.get('message', 'Unknown error')}")
 
     def leave_room(self) -> None:
-        room_id = input("輸入要離開的 room_id：").strip()
+        if self.current_room_id:
+            room_id = self.current_room_id
+        else:
+            room_id = input("Enter room_id to leave: ").strip()
+        
+        if not room_id:
+            return
+
         send_json(self.sock, {
             "action": "leave_room",
             "room_id": room_id,
         })
         resp = recv_json(self.sock)
-        print("伺服器:", resp)
+        
+        if resp and resp.get("status") == "ok":
+            print(f"✅ Left room {room_id}")
+            if self.current_room_id == room_id:
+                self.current_room_id = None
+        else:
+            print(f"❌ Failed to leave: {resp.get('message', 'Unknown error')}")
 
-    def start_game(self):
-        room_id = input("房主請輸入要開始的 room_id：").strip()
+    def start_game(self) -> None:
+        if self.current_room_id:
+            room_id = self.current_room_id
+            print(f"Using current room: {room_id}")
+        else:
+            room_id = input("Enter room_id to start: ").strip()
+
+        if not room_id:
+            return
+
         send_json(self.sock, {"action": "start_game", "room_id": room_id})
         resp = recv_json(self.sock)
-        print("伺服器:", resp)
 
         if resp.get("status") != "ok":
+            print(f"❌ Failed to start: {resp.get('message', 'Unknown error')}")
             return
 
-        room_info = resp["room_info"]
-        game_port = resp["game_port"]
-        game_id = room_info["game_id"]
+        room_info = resp.get("room_info", {})
+        game_port = resp.get("game_port")
+        game_id = room_info.get("game_id")
 
-        # 找到本地 game 資料夾
-        game_dir = None
-        for d in GAMES_ROOT.iterdir():
-            if d.name.startswith(game_id):
-                game_dir = d
-                break
+        print(f"✅ Game starting on port {game_port}")
+
+        # Find local game directory
+        game_dir = self._get_game_dir(game_id)
         if not game_dir:
-            print("⚠ 遊戲尚未下載")
+            print("⚠ Game not downloaded, cannot launch client")
             return
 
-        # 找 entry
+        # Find client entry
         entry = None
-        for f in game_dir.rglob("*client*.py"):
-            entry = f
-            break
+        for root, dirs, files in os.walk(game_dir):
+            for f in files:
+                if "client" in f.lower() and f.endswith(".py"):
+                    entry = os.path.join(root, f)
+                    break
+            if entry:
+                break
+
         if not entry:
-            print("⚠ 找不到 client entry")
+            print("⚠ Cannot find client entry file")
             return
 
-        # 啟動遊戲
-        cmd = [sys.executable, str(entry), "--host", "127.0.0.1", "--port", str(game_port), "--name", self.username]
-        print("🎮 啟動遊戲：", cmd)
-        subprocess.Popen(cmd)
+        # Launch game client
+        cmd = [
+            sys.executable, entry,
+            "--host", "127.0.0.1",
+            "--port", str(game_port),
+            "--name", self.username
+        ]
+        print(f"🎮 Launching game: {' '.join(cmd)}")
+        
+        try:
+            subprocess.Popen(cmd)
+            print("✅ Game launched!")
+        except Exception as e:
+            print(f"❌ Launch failed: {e}")
 

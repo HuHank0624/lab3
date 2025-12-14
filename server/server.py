@@ -62,3 +62,9 @@ class GamePlatformServer:
 if __name__ == "__main__":
     server = GamePlatformServer()
     server.start()
+
+
+def main():
+    """Entry point for module execution."""
+    server = GamePlatformServer()
+    server.start()

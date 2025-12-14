@@ -1,3 +1,31 @@
 {
-  "users": []
+  "users": [
+    {
+      "username": "dev",
+      "password": "ef260e9aa3c673af240d17a2660480361a8e081d1ffeca2a5ed0e3219fc18567",
+      "role": "developer",
+      "owned_games": [],
+      "uploaded_games": [
+        "d333dc4771064bb99d60e8379ad03904"
+      ]
+    },
+    {
+      "username": "1",
+      "password": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "role": "player",
+      "owned_games": [
+        "d333dc4771064bb99d60e8379ad03904"
+      ],
+      "uploaded_games": []
+    },
+    {
+      "username": "2",
+      "password": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+      "role": "player",
+      "owned_games": [
+        "d333dc4771064bb99d60e8379ad03904"
+      ],
+      "uploaded_games": []
+    }
+  ]
 }

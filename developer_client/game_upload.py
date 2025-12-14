@@ -9,6 +9,8 @@ from pathlib import Path
 from utils.protocol import send_json, recv_json
 from utils.file_transfer import encode_chunk
 
+# Default games directory
+GAMES_DIR = Path(__file__).resolve().parent.parent / "games"
 
 
 class GameUploader:
@@ -17,17 +19,76 @@ class GameUploader:
         self.username = username
 
     # ------------------------------------------------------------
+    # Helper: Scan games folder
+    # ------------------------------------------------------------
+    def scan_games_folder(self) -> list[Path]:
+        """Scan ./games folder for available game directories."""
+        if not GAMES_DIR.exists():
+            return []
+        return [p for p in GAMES_DIR.iterdir() if p.is_dir() and not p.name.startswith('.')]
+
+    def choose_existing_game(self) -> Path | None:
+        """Let developer select from existing game folders."""
+        games = self.scan_games_folder()
+        
+        if not games:
+            print(f"(No game folders found in {GAMES_DIR})")
+            return None
+        
+        print(f"\n=== Available Games in {GAMES_DIR} ===")
+        for idx, g in enumerate(games, start=1):
+            # List some files to help identify
+            files = [f.name for f in g.iterdir() if f.is_file() and f.suffix == '.py'][:3]
+            print(f"{idx}. {g.name}/  (files: {', '.join(files)}...)")
+        
+        print(f"{len(games) + 1}. Enter custom path")
+        
+        choice = input("\nSelect folder number: ").strip()
+        if not choice.isdigit():
+            return None
+        idx = int(choice)
+        
+        if idx == len(games) + 1:
+            # Custom path
+            custom = input("Enter full path: ").strip()
+            return Path(custom) if custom else None
+        
+        if 1 <= idx <= len(games):
+            return games[idx - 1]
+        return None
+
+    # ------------------------------------------------------------
     # Step 1 — Developer fills fields in terminal
     # ------------------------------------------------------------
-    def input_game_metadata(self) -> dict | None:
+    def input_game_metadata(self, folder: Path = None) -> dict | None:
         print("\n=== Upload New Game ===")
 
         name = input("Game Name: ").strip()
-        version = input("Version: ").strip()
+        version = input("Version (e.g., 1.0.0): ").strip()
         description = input("Description: ").strip()
 
-        server_entry = input("Server Entry (e.g., gomoku_server.py): ").strip()
-        client_entry = input("Client Entry (e.g., gomoku_client.py): ").strip()
+        # Auto-detect entry files if folder is provided
+        server_entry = ""
+        client_entry = ""
+        
+        if folder:
+            py_files = [f.name for f in folder.iterdir() if f.suffix == '.py']
+            server_files = [f for f in py_files if 'server' in f.lower()]
+            client_files = [f for f in py_files if 'client' in f.lower()]
+            
+            if server_files:
+                print(f"\nDetected server files: {server_files}")
+                server_entry = server_files[0]
+            if client_files:
+                print(f"Detected client files: {client_files}")
+                client_entry = client_files[0]
+
+        print("\n[Entry Files]")
+        server_input = input(f"Server Entry [{server_entry}]: ").strip()
+        server_entry = server_input if server_input else server_entry
+        
+        client_input = input(f"Client Entry [{client_entry}]: ").strip()
+        client_entry = client_input if client_input else client_entry
 
         if not all([name, version, description, server_entry, client_entry]):
             print("❌ All fields are required.")
@@ -64,6 +125,21 @@ class GameUploader:
 
         print("✅ Folder validated.")
         return folder
+    
+    def validate_folder(self, folder: Path, info: dict) -> bool:
+        """Validate that folder contains required entry files."""
+        server_path = folder / info["server_entry"]
+        client_path = folder / info["client_entry"]
+
+        if not server_path.exists():
+            print(f"❌ Missing server entry: {server_path}")
+            return False
+        if not client_path.exists():
+            print(f"❌ Missing client entry: {client_path}")
+            return False
+
+        print("✅ Folder validated.")
+        return True
 
     # ------------------------------------------------------------
     # Step 3 — Create zip file
@@ -93,12 +169,26 @@ class GameUploader:
     # Step 4 — Upload via chunk protocol
     # ------------------------------------------------------------
     def upload_game(self):
-        info = self.input_game_metadata()
+        # First, let user select game folder
+        print("\n=== Select Game Folder ===")
+        folder = self.choose_existing_game()
+        
+        if not folder:
+            return
+        
+        if not folder.exists() or not folder.is_dir():
+            print(f"❌ Invalid folder: {folder}")
+            return
+        
+        print(f"\nSelected: {folder}")
+        
+        # Get metadata with auto-detection
+        info = self.input_game_metadata(folder)
         if not info:
             return
 
-        folder = self.choose_game_folder(info)
-        if not folder:
+        # Validate the folder has required files
+        if not self.validate_folder(folder, info):
             return
 
         zip_path = self.create_zip(folder, info)
@@ -115,39 +205,34 @@ class GameUploader:
 
         resp = recv_json(self.sock)
         if resp.get("status") != "ok":
-            print("❌ Upload init failed:", resp)
+            print(f"❌ Upload init failed: {resp.get('message', 'Unknown error')}")
             return
 
         upload_id = resp["upload_id"]
         chunk_size = resp["chunk_size"]
 
-        print(f"🚀 Uploading with upload_id={upload_id}, chunk_size={chunk_size}")
+        print(f"🚀 Uploading with upload_id={upload_id[:8]}..., chunk_size={chunk_size}")
 
         # 2. Stream chunks
         with open(zip_path, "rb") as f:
             while True:
                 chunk = f.read(chunk_size)
-                if not chunk:
-                    # send final EOF chunk
-                    send_json(self.sock, {
-                        "action": "upload_game_chunk",
-                        "upload_id": upload_id,
-                        "data": encode_chunk(b""),
-                        "eof": True,
-                    })
-                    break
-
+                eof = not chunk or len(chunk) < chunk_size
+                
                 send_json(self.sock, {
                     "action": "upload_game_chunk",
                     "upload_id": upload_id,
-                    "data": encode_chunk(chunk),
-                    "eof": False,
+                    "data": encode_chunk(chunk if chunk else b""),
+                    "eof": eof,
                 })
 
                 resp = recv_json(self.sock)
                 if resp.get("status") != "ok":
-                    print("❌ Upload failed:", resp)
+                    print(f"❌ Upload failed: {resp.get('message', 'Unknown error')}")
                     return
+                
+                if eof:
+                    break
 
         print("🎉 Game uploaded successfully!")
         zip_path.unlink()  # remove temp zip

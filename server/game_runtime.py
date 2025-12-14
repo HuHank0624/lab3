@@ -42,10 +42,13 @@ class GameRuntime:
                 zf.extractall(extract_dir)
             open(marker_path, "w").close()  # 只寫一個 marker
 
-        cli_entry = os.path.join(extract_dir, game["cli_entry"])
-        server_entry = os.path.join(extract_dir, game["cli_entry"].replace("_client", "_server"))
-        # 🔥 為通用性，可改成存 server_entry 到 games.json
-        # 先兼容你使用 cli_entry/ gui_entry 的做法
+        # Note: gui_entry stores the server entry file name
+        cli_entry = os.path.join(extract_dir, game.get("cli_entry", ""))
+        server_entry = os.path.join(extract_dir, game.get("gui_entry", ""))
+        
+        # Fallback: try to derive server entry from cli entry
+        if not server_entry or not os.path.exists(server_entry):
+            server_entry = os.path.join(extract_dir, game.get("cli_entry", "").replace("_client", "_server"))
 
         return {
             "extract_dir": extract_dir,

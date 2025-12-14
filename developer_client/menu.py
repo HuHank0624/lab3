@@ -16,7 +16,7 @@ class DeveloperMenu:
             print("1. Register")
             print("2. Login")
             print("0. Exit")
-            choice = input("> ")
+            choice = input("> ").strip()
 
             if choice == "1":
                 self.auth.register()
@@ -27,6 +27,8 @@ class DeveloperMenu:
             elif choice == "0":
                 print("Bye!")
                 return
+            else:
+                print("Invalid option.")
 
     def after_login_menu(self):
         manager = GameManagerClient(self.sock, self.auth.username)
@@ -34,11 +36,13 @@ class DeveloperMenu:
 
         while True:
             print("\n========== Developer Dashboard ==========")
+            print(f"Logged in as: {self.auth.username}")
             print("1. Upload new game")
             print("2. Update existing game")
             print("3. List my games")
+            print("4. Delete (unlist) game")
             print("0. Logout")
-            choice = input("> ")
+            choice = input("> ").strip()
 
             if choice == "1":
                 uploader.upload_game()
@@ -46,6 +50,11 @@ class DeveloperMenu:
                 manager.update_game()
             elif choice == "3":
                 manager.list_my_games()
+            elif choice == "4":
+                manager.delete_game()
             elif choice == "0":
                 print("Logged out.")
+                self.logged_in = False
                 return
+            else:
+                print("Invalid option.")

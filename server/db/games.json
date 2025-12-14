@@ -1,3 +1,16 @@
 {
-  "games": []
+  "games": [
+    {
+      "game_id": "d333dc4771064bb99d60e8379ad03904",
+      "name": "g",
+      "developer": "dev",
+      "version": "1",
+      "description": "g",
+      "file_path": "C:\\Users\\ASUS\\Desktop\\114-1\\Intro_to_NP\\lab3\\server\\storage\\c1ee4b2ecbcc43b497f687a51e679e54.zip",
+      "cli_entry": "gomoku_client.py",
+      "gui_entry": "gomoku_server.py",
+      "downloads": 2,
+      "reviews": []
+    }
+  ]
 }

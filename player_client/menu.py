@@ -16,10 +16,10 @@ class PlayerMenu:
 
     def run(self):
         while True:
-            print("\n=========== 玩家主選單（未登入） ===========")
-            print("1. 註冊帳號")
-            print("2. 登入")
-            print("0. 離開程式")
+            print("\n=========== Player Menu (Not Logged In) ===========")
+            print("1. Register")
+            print("2. Login")
+            print("0. Exit")
             choice = input("> ").strip()
 
             if choice == "1":
@@ -32,7 +32,7 @@ class PlayerMenu:
                 print("Bye!")
                 return
             else:
-                print("無效選項。")
+                print("Invalid option.")
 
     def after_login_menu(self):
         username = self.auth.username
@@ -43,13 +43,13 @@ class PlayerMenu:
         review = ReviewClient(self.sock, username)
 
         while True:
-            print("\n=========== 玩家主選單（已登入） ===========")
-            print(f"目前帳號：{username}")
-            print("1. 瀏覽遊戲商城（下載遊戲）")
-            print("2. 我的遊戲庫")
-            print("3. 進入遊戲大廳")
-            print("4. 對遊戲評分與留言")
-            print("0. 登出")
+            print("\n=========== Player Menu (Logged In) ===========")
+            print(f"Current user: {username}")
+            print("1. Browse Game Store")
+            print("2. My Game Library")
+            print("3. Enter Game Lobby")
+            print("4. Rate & Review Games")
+            print("0. Logout")
             choice = input("> ").strip()
 
             if choice == "1":
@@ -61,8 +61,8 @@ class PlayerMenu:
             elif choice == "4":
                 review.list_games_and_review()
             elif choice == "0":
-                print("已登出。")
+                print("Logged out.")
                 self.logged_in = False
                 return
             else:
-                print("無效選項。")
+                print("Invalid option.")
