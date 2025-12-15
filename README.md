@@ -4,45 +4,6 @@ A multiplayer game platform with lobby, store, developer upload, and game runtim
 
 ---
 
-## 📋 Requirements Checklist
-
-### Account System ✅
-- [x] Developer and Player accounts are **separate** (different registration)
-- [x] Simple username + password registration
-- [x] No duplicate usernames (checked during registration)
-- [x] Login validation (password check)
-- [x] One session per account (new login overwrites old session)
-
-### Developer Platform ✅
-- [x] **D1: Upload new game** - Developers can upload games with name, version, description
-- [x] **D2: Update game** - Re-upload with new version number
-- [x] **D3: Delete/Unlist game** - Remove game from store
-- [x] Developer can only manage their own games
-- [x] Game template system (`create_game_template.py`)
-- [x] Developer games stored in `developer_client/games/`
-
-### Player Platform ✅
-- [x] **P1: Browse store** - View game list, details, ratings, reviews
-- [x] **P2: Download games** - Download to per-user folder (`player_client/games/<username>/`)
-- [x] **P3: Create room & Start game** - Host-only start, auto-launch game server
-- [x] **P4: Rate & Review** - 1-5 star rating with comments
-- [x] Per-user game folders (simulates multiple players on same machine)
-- [x] One room per player limit
-
-### Server Features ✅
-- [x] Data persists after restart (JSON files in `server/db/`)
-- [x] Game file storage (`server/storage/uploads/`)
-- [x] Game runtime extraction (`server/storage/runtime/`)
-- [x] Room management (create, join, leave, close)
-- [x] Game server auto-launch
-
-### Menu-Driven Interface ✅
-- [x] Clear numbered options at each step
-- [x] Pagination for long menus (max 5 options per page)
-- [x] No command-line knowledge required
-
----
-
 ## 🚀 Quick Start (Local Testing)
 
 ### 1. Start Server
