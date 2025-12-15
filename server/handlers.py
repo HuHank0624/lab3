@@ -1,5 +1,5 @@
 # path: server/handlers.py
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from utils.file_transfer import decode_chunk, encode_chunk
 from utils.protocol import send_error, send_ok, send_json, recv_json
@@ -8,8 +8,11 @@ from .auth import AuthManager
 from .data import DataStore
 from .game_manager import GameManager
 from .lobby_manager import LobbyManager
+from .room_subscriptions import RoomSubscriptionManager
 from .utils import log
 import os
+
+
 class RequestHandlers:
     def __init__(
         self,
@@ -17,11 +20,13 @@ class RequestHandlers:
         auth: AuthManager,
         games: GameManager,
         lobby: LobbyManager,
+        subscriptions: Optional[RoomSubscriptionManager] = None,
     ):
         self.datastore = datastore
         self.auth = auth
         self.games = games
         self.lobby = lobby
+        self.subscriptions = subscriptions
 
     # ---- main entry ----
     def handle(self, sock, conn_id: int, msg: Dict[str, Any]) -> None:
@@ -82,11 +87,20 @@ class RequestHandlers:
             elif action == "set_ready" and role == "player":
                 self._handle_set_ready(sock, username, msg)
 
+            elif action == "subscribe_room" and role == "player":
+                self._handle_subscribe_room(sock, username, msg)
+
+            elif action == "unsubscribe_room" and role == "player":
+                self._handle_unsubscribe_room(sock, username)
+
             elif action == "close_room" and role == "player":
                 self._handle_close_room(sock, username, msg)
 
             elif action == "start_game" and role == "player":
                 self._handle_start_game(sock, username, msg)
+
+            elif action == "end_game" and role == "player":
+                self._handle_end_game(sock, username, msg)
 
             elif action == "download_game" and role == "player":
                 self._handle_download_game(sock, username, msg)
@@ -150,6 +164,7 @@ class RequestHandlers:
         send_ok(sock, games=games)
 
     def _handle_upload_init(self, sock, developer: str, msg: Dict[str, Any]) -> None:
+        game_id = msg.get("game_id")  # For updates
         name = msg.get("name", "").strip()
         version = msg.get("version", "").strip()
         description = msg.get("description", "").strip()
@@ -161,6 +176,16 @@ class RequestHandlers:
             send_error(sock, "name and version are required")
             return
 
+        # If game_id provided, verify it belongs to this developer
+        if game_id:
+            existing = self.games.get_game(game_id)
+            if not existing:
+                send_error(sock, "Game not found for update")
+                return
+            if existing.get("developer") != developer:
+                send_error(sock, "You can only update your own games")
+                return
+
         upload_id, chunk_size, _ = self.games.start_upload(
             developer=developer,
             name=name,
@@ -169,6 +194,7 @@ class RequestHandlers:
             cli_entry=cli_entry,
             gui_entry=gui_entry,
             max_players=max_players,
+            game_id=game_id,  # Pass game_id for update
         )
         send_ok(sock, upload_id=upload_id, chunk_size=chunk_size)
 
@@ -264,6 +290,11 @@ class RequestHandlers:
         resp = self.lobby.join_room(room_id, username)
         if resp["status"] == "ok":
             send_ok(sock, room_info=resp["room_info"])
+            # Broadcast to other players in room
+            if self.subscriptions:
+                room = self.datastore.get_room(room_id)
+                if room:
+                    self.subscriptions.broadcast_room_update(room_id, room, exclude_sock=sock)
         else:
             send_error(sock, resp["message"])
 
@@ -274,6 +305,13 @@ class RequestHandlers:
             return
 
         self.lobby.leave_room(room_id, username)
+        # Unsubscribe from room updates
+        if self.subscriptions:
+            self.subscriptions.unsubscribe(sock)
+            # Broadcast to remaining players
+            room = self.datastore.get_room(room_id)
+            if room:
+                self.subscriptions.broadcast_room_update(room_id, room)
         send_ok(sock)
 
     def _handle_set_ready(self, sock, username: str, msg: Dict[str, Any]) -> None:
@@ -286,8 +324,30 @@ class RequestHandlers:
         resp = self.lobby.set_ready(room_id, username, ready)
         if resp["status"] == "ok":
             send_json(sock, {"status": "ok", "ready": resp["ready"]})
+            # Broadcast to other players in room
+            if self.subscriptions:
+                room = self.datastore.get_room(room_id)
+                if room:
+                    self.subscriptions.broadcast_room_update(room_id, room, exclude_sock=sock)
         else:
             send_error(sock, resp["message"])
+
+    def _handle_subscribe_room(self, sock, username: str, msg: Dict[str, Any]) -> None:
+        """Subscribe to room updates for real-time notifications."""
+        room_id = msg.get("room_id")
+        if not room_id:
+            send_error(sock, "room_id required")
+            return
+        
+        if self.subscriptions:
+            self.subscriptions.subscribe(room_id, sock, username)
+        send_ok(sock, message="Subscribed to room updates")
+
+    def _handle_unsubscribe_room(self, sock, username: str) -> None:
+        """Unsubscribe from room updates."""
+        if self.subscriptions:
+            self.subscriptions.unsubscribe(sock)
+        send_ok(sock, message="Unsubscribed from room updates")
 
     def _handle_close_room(self, sock, username: str, msg: Dict[str, Any]) -> None:
         room_id = msg.get("room_id")
@@ -325,6 +385,22 @@ class RequestHandlers:
             return
 
         resp = self.lobby.start_game(room_id, username)
+        if resp["status"] == "ok":
+            send_ok(sock, **resp)
+            # Broadcast game started to all players (including non-host)
+            if self.subscriptions:
+                room_info = resp.get("room_info", {})
+                self.subscriptions.broadcast_game_started(room_id, room_info)
+        else:
+            send_error(sock, resp["message"])
+
+    def _handle_end_game(self, sock, username: str, msg: Dict[str, Any]) -> None:
+        room_id = msg.get("room_id")
+        if not room_id:
+            send_error(sock, "room_id required")
+            return
+
+        resp = self.lobby.end_game(room_id, username)
         if resp["status"] == "ok":
             send_ok(sock, **resp)
         else:

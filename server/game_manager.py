@@ -22,6 +22,7 @@ class UploadSession:
         gui_entry: str,
         target_path: str,
         max_players: int = 2,
+        game_id: Optional[str] = None,  # For updates
     ):
         self.upload_id = upload_id
         self.developer = developer
@@ -32,6 +33,7 @@ class UploadSession:
         self.gui_entry = gui_entry
         self.target_path = target_path
         self.max_players = max_players
+        self.game_id = game_id  # If set, this is an update
         self.file = open(target_path, "wb")
         self.lock = threading.Lock()
         self.finished = False
@@ -71,6 +73,7 @@ class GameManager:
         cli_entry: str,
         gui_entry: str,
         max_players: int = 2,
+        game_id: Optional[str] = None,  # For updates
     ) -> Tuple[str, int, str]:
         """
         Create a new upload session.
@@ -92,10 +95,11 @@ class GameManager:
             gui_entry=gui_entry,
             target_path=target_path,
             max_players=max_players,
+            game_id=game_id,  # Pass game_id for update
         )
         with self.uploads_lock:
             self.uploads[upload_id] = sess
-        log(f"Upload session created: {upload_id} -> {target_path}")
+        log(f"Upload session created: {upload_id} -> {target_path}" + (f" (updating {game_id})" if game_id else ""))
         return upload_id, chunk_size, target_path
 
     def write_upload_chunk(self, upload_id: str, chunk: bytes, eof: bool) -> Optional[str]:
@@ -116,6 +120,7 @@ class GameManager:
                 cli_entry=sess.cli_entry,
                 gui_entry=sess.gui_entry,
                 max_players=sess.max_players,
+                game_id=sess.game_id,  # Pass game_id for update
             )
             # after finalize, remove from active uploads
             with self.uploads_lock:

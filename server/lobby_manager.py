@@ -126,9 +126,10 @@ class LobbyManager:
             return {"status": "error", "message": "Game not found"}
 
         port = room["game_port"]
+        num_players = len(players)  # Use actual player count
 
         # Start game server
-        ok = self.runtime.start_game_server(room_id, game, port)
+        ok = self.runtime.start_game_server(room_id, game, port, num_players)
         if not ok:
             return {"status": "error", "message": "Failed to launch game server"}
 
@@ -137,4 +138,29 @@ class LobbyManager:
             "status": "ok",
             "room_info": self.datastore.get_room(room_id),
             "game_port": port,
+        }
+
+    def end_game(self, room_id: str, username: str) -> Dict[str, Any]:
+        """End the game and reset room to waiting state."""
+        room = self.datastore.get_room(room_id)
+        if not room:
+            return {"status": "error", "message": "Room not found"}
+        if username not in room.get("players", []):
+            return {"status": "error", "message": "You are not in this room"}
+        
+        # Stop game server if running
+        if room_id in self.runtime.running_servers:
+            proc = self.runtime.running_servers[room_id]
+            try:
+                proc.terminate()
+            except:
+                pass
+            del self.runtime.running_servers[room_id]
+        
+        # Reset room for new game
+        self.datastore.reset_room_for_new_game(room_id)
+        
+        return {
+            "status": "ok",
+            "room_info": self.datastore.get_room(room_id),
         }

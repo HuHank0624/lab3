@@ -381,3 +381,14 @@ class DataStore:
                     # All players must be ready (including host)
                     return len(players) >= 2 and set(players) == set(ready_players)
         return False
+
+    def reset_room_for_new_game(self, room_id: str) -> bool:
+        """Reset room status to waiting and clear ready_players."""
+        with self.rooms.with_lock():
+            for r in self.rooms.data["rooms"]:
+                if r["room_id"] == room_id:
+                    r["status"] = "waiting"
+                    r["ready_players"] = []
+                    self.rooms.save()
+                    return True
+        return False

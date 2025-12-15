@@ -21,7 +21,7 @@ class GameRuntime:
         # room_id -> temp directory (for extracted game files)
         self.temp_dirs: Dict[str, str] = {}
 
-    def start_game_server(self, room_id: str, game: Dict[str, Any], port: int) -> bool:
+    def start_game_server(self, room_id: str, game: Dict[str, Any], port: int, num_players: int = 2) -> bool:
         """
         Start a game server for a room.
         
@@ -29,6 +29,7 @@ class GameRuntime:
             room_id: The room ID
             game: Game metadata dict with file_path, cli_entry, etc.
             port: TCP port for the game server
+            num_players: Number of players for this room
             
         Returns:
             True if server started successfully
@@ -59,6 +60,7 @@ class GameRuntime:
                 server_entry,
                 "--host", "0.0.0.0",
                 "--port", str(port),
+                "--players", str(num_players),
             ]
             
             log(f"[GameRuntime] Starting: {' '.join(cmd)}")

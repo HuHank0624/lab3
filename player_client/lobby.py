@@ -1,5 +1,7 @@
 # path: player_client/lobby.py
 import socket
+import threading
+import select
 from typing import Dict, Any, List, Optional
 from utils.protocol import send_json, recv_json
 from .library import GameLibrary
@@ -22,6 +24,10 @@ class LobbyClient:
         self.username = username
         self.library = GameLibrary(username)
         self.current_room_id: Optional[str] = None
+        # For real-time updates
+        self._pending_update: Optional[Dict] = None
+        self._update_lock = threading.Lock()
+        self._in_waiting_room = False
 
     # ----- helper -----
 
@@ -50,7 +56,8 @@ class LobbyClient:
 
         print("\n=== Select a Game ===")
         for idx, g in enumerate(games, start=1):
-            print(f"{idx}. {g['name']} (id={g['game_id'][:8]}...) v{g['version']}")
+            max_p = g.get('max_players', 2)
+            print(f"{idx}. {g['name']} (v{g['version']}) [{max_p} players]")
 
         choice = input("Select game (or 0 to cancel): ").strip()
         if not choice.isdigit():
@@ -94,6 +101,24 @@ class LobbyClient:
                         info = json.load(f)
                         if info.get("game_id") == game_id:
                             return str(d)
+                except:
+                    pass
+        return None
+
+    def _get_installed_game_version(self, game_id: str) -> Optional[str]:
+        """Get version of installed game."""
+        user_games_dir = GAMES_ROOT / self.username
+        if not user_games_dir.exists():
+            return None
+        for d in user_games_dir.iterdir():
+            info_file = d / "game_info.json"
+            if info_file.exists():
+                try:
+                    import json
+                    with open(info_file, "r") as f:
+                        info = json.load(f)
+                        if info.get("game_id") == game_id:
+                            return info.get("version")
                 except:
                     pass
         return None
@@ -195,92 +220,166 @@ class LobbyClient:
         else:
             print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
 
+    def _display_room_status(self, room: Dict[str, Any]) -> None:
+        """Display current room status."""
+        players = room.get("players", [])
+        ready_players = room.get("ready_players", [])
+        is_host = room.get("host") == self.username
+        my_ready = self.username in ready_players
+        
+        print(f"\n--- Room: {room.get('room_name', 'Unknown')} ---")
+        print(f"Game: {room.get('game_id', 'Unknown')[:8]}...")
+        print(f"Players ({len(players)}/{room.get('max_players', 2)}):")
+        for p in players:
+            status = "[READY]" if p in ready_players else "[NOT READY]"
+            host_tag = " (HOST)" if p == room.get("host") else ""
+            you_tag = " <-- YOU" if p == self.username else ""
+            print(f"  - {p} {status}{host_tag}{you_tag}")
+        
+        print(f"\nReady: {len(ready_players)}/{len(players)}")
+        
+        # Show available actions
+        print(f"\n[r] Toggle Ready (currently: {'READY' if my_ready else 'NOT READY'})")
+        if is_host:
+            all_ready = len(ready_players) == len(players) and len(players) >= 2
+            if all_ready:
+                print("[s] Start Game (all players ready!)")
+            else:
+                print("[s] Start Game (waiting for all players to be ready)")
+        print("[q] Quit waiting room")
+        print("(Room updates automatically when others change status)")
+
     def waiting_room(self) -> None:
-        """Enter the waiting room - shows room status, allows ready toggle, and auto-launches when game starts."""
+        """Enter the waiting room with real-time updates."""
         if not self.current_room_id:
             print("[!] You are not in a room. Join a room first.")
             return
 
         print("\n=== Waiting Room ===")
-        print("Commands: 'r' = toggle ready, 's' = start game (host only), 'q' = quit waiting room, '' (enter) = refresh")
+        print("Commands: 'r' = toggle ready, 's' = start game (host only), 'q' = quit")
         print("The game client will auto-launch when the host starts the game!\n")
 
-        while True:
-            # Get current room info
-            send_json(self.sock, {"action": "get_room_info", "room_id": self.current_room_id})
-            resp = recv_json(self.sock)
-            
-            if resp.get("status") != "ok":
-                print(f"[!] Failed to get room info: {resp.get('message', 'Unknown error')}")
-                return
+        # Subscribe to room updates
+        send_json(self.sock, {"action": "subscribe_room", "room_id": self.current_room_id})
+        resp = recv_json(self.sock)
+        if resp and resp.get("status") != "ok":
+            print(f"[!] Warning: Could not subscribe to updates")
 
-            room = resp.get("room", {})
-            
-            # Check if room still exists
-            if not room:
-                print("[!] Room no longer exists.")
-                self.current_room_id = None
-                return
-            
-            # Check if game has started - auto-launch!
-            if room.get("status") == "playing":
-                print("\n[!] Game has started! Launching game client...")
-                print(f"[DEBUG] Room info: status={room.get('status')}, game_port={room.get('game_port')}, game_id={room.get('game_id')}")
-                self._auto_launch_game(room)
-                return
+        # Get initial room info
+        send_json(self.sock, {"action": "get_room_info", "room_id": self.current_room_id})
+        resp = recv_json(self.sock)
+        
+        if resp.get("status") != "ok":
+            print(f"[!] Failed to get room info: {resp.get('message', 'Unknown error')}")
+            return
 
-            # Display room status
-            players = room.get("players", [])
-            ready_players = room.get("ready_players", [])
-            is_host = room.get("host") == self.username
-            my_ready = self.username in ready_players
-            
-            print(f"--- Room: {room.get('room_name', 'Unknown')} ---")
-            print(f"Game: {room.get('game_id', 'Unknown')[:8]}...")
-            print(f"Players ({len(players)}/{room.get('max_players', 2)}):")
-            for p in players:
-                status = "[READY]" if p in ready_players else "[NOT READY]"
-                host_tag = " (HOST)" if p == room.get("host") else ""
-                you_tag = " <-- YOU" if p == self.username else ""
-                print(f"  - {p} {status}{host_tag}{you_tag}")
-            
-            print(f"\nReady: {len(ready_players)}/{len(players)}")
-            
-            # Show available actions
-            print(f"\n[r] Toggle Ready (currently: {'READY' if my_ready else 'NOT READY'})")
-            if is_host:
-                all_ready = len(ready_players) == len(players) and len(players) >= 2
-                if all_ready:
-                    print("[s] Start Game (all players ready!)")
-                else:
-                    print("[s] Start Game (waiting for all players to be ready)")
-            print("[q] Quit waiting room")
-            print("[Enter] Refresh status")
-            
-            user_input = input("\n> ").strip().lower()
-            
-            if user_input == 'q':
-                print("[*] Leaving waiting room (you're still in the room)")
-                return
-            elif user_input == 'r':
-                self._do_toggle_ready()
-            elif user_input == 's':
-                if is_host:
-                    self._do_start_game()
-                    # Check if game started successfully
+        room = resp.get("room", {})
+        if not room:
+            print("[!] Room no longer exists.")
+            self.current_room_id = None
+            return
+        
+        # Check if already playing
+        if room.get("status") == "playing":
+            print("\n[!] Game has started! Launching game client...")
+            self._auto_launch_game(room)
+            return
+
+        self._display_room_status(room)
+        self._in_waiting_room = True
+        
+        # Start listener thread for updates
+        stop_event = threading.Event()
+        update_event = threading.Event()
+        current_room = {"room": room}
+        
+        def listener():
+            self.sock.setblocking(False)
+            while not stop_event.is_set():
+                try:
+                    # Use select with timeout to check for data
+                    ready, _, _ = select.select([self.sock], [], [], 0.5)
+                    if ready:
+                        msg = recv_json(self.sock)
+                        if msg:
+                            msg_type = msg.get("type")
+                            if msg_type == "room_update":
+                                current_room["room"] = msg.get("room", {})
+                                print("\n[*] Room updated!")
+                                self._display_room_status(current_room["room"])
+                                print("> ", end="", flush=True)
+                            elif msg_type == "game_started":
+                                current_room["room"] = msg.get("room", {})
+                                current_room["game_started"] = True
+                                print("\n[!] Game has started! Launching game client...")
+                                update_event.set()
+                                break
+                except BlockingIOError:
+                    pass
+                except Exception as e:
+                    if not stop_event.is_set():
+                        pass  # Ignore errors during shutdown
+            self.sock.setblocking(True)
+
+        listener_thread = threading.Thread(target=listener, daemon=True)
+        listener_thread.start()
+
+        try:
+            while True:
+                user_input = input("\n> ").strip().lower()
+                
+                # Check if game started via notification
+                if current_room.get("game_started"):
+                    stop_event.set()
+                    self._auto_launch_game(current_room["room"])
+                    return
+                
+                if user_input == 'q':
+                    print("[*] Leaving waiting room (you're still in the room)")
+                    break
+                elif user_input == 'r':
+                    self._do_toggle_ready()
+                    # Refresh display
                     send_json(self.sock, {"action": "get_room_info", "room_id": self.current_room_id})
-                    check_resp = recv_json(self.sock)
-                    if check_resp.get("status") == "ok":
-                        check_room = check_resp.get("room", {})
-                        if check_room.get("status") == "playing":
-                            print("\n[!] Game started! Launching game client...")
-                            self._auto_launch_game(check_room)
-                            return
+                    resp = recv_json(self.sock)
+                    if resp and resp.get("status") == "ok":
+                        current_room["room"] = resp.get("room", {})
+                        self._display_room_status(current_room["room"])
+                elif user_input == 's':
+                    room = current_room["room"]
+                    is_host = room.get("host") == self.username
+                    if is_host:
+                        self._do_start_game()
+                        # Check if game started successfully
+                        send_json(self.sock, {"action": "get_room_info", "room_id": self.current_room_id})
+                        check_resp = recv_json(self.sock)
+                        if check_resp and check_resp.get("status") == "ok":
+                            check_room = check_resp.get("room", {})
+                            if check_room.get("status") == "playing":
+                                print("\n[!] Game started! Launching game client...")
+                                stop_event.set()
+                                self._auto_launch_game(check_room)
+                                return
+                            current_room["room"] = check_room
+                            self._display_room_status(check_room)
+                    else:
+                        print("[!] Only the host can start the game.")
                 else:
-                    print("[!] Only the host can start the game.")
-            # Empty input or anything else just refreshes
-            
-            print("\n" + "="*40 + "\n")
+                    # Refresh
+                    send_json(self.sock, {"action": "get_room_info", "room_id": self.current_room_id})
+                    resp = recv_json(self.sock)
+                    if resp and resp.get("status") == "ok":
+                        current_room["room"] = resp.get("room", {})
+                        self._display_room_status(current_room["room"])
+        finally:
+            stop_event.set()
+            self._in_waiting_room = False
+            # Unsubscribe
+            try:
+                send_json(self.sock, {"action": "unsubscribe_room"})
+                recv_json(self.sock)
+            except:
+                pass
 
     def _do_toggle_ready(self) -> None:
         """Internal: toggle ready status without room check."""
@@ -319,7 +418,7 @@ class LobbyClient:
         print(f"[OK] Game server started on port {game_port}")
 
     def _auto_launch_game(self, room: Dict[str, Any]) -> None:
-        """Auto-launch game client when game starts."""
+        """Auto-launch game client when game starts. Waits for game to finish, then returns to waiting room."""
         game_port = room.get("game_port")
         game_id = room.get("game_id")
 
@@ -366,8 +465,24 @@ class LobbyClient:
         
         try:
             # Redirect stdout/stderr to DEVNULL so game output doesn't clutter the lobby terminal
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             print("[OK] Game launched!")
+            print("[*] Waiting for game to finish...")
+            
+            # Wait for game client to close
+            proc.wait()
+            
+            print("\n[*] Game ended. Returning to waiting room...")
+            
+            # Notify server to reset room status
+            if self.current_room_id:
+                send_json(self.sock, {"action": "end_game", "room_id": self.current_room_id})
+                resp = recv_json(self.sock)
+                if resp and resp.get("status") == "ok":
+                    print("[OK] Room reset to waiting state.")
+                # Go back to waiting room loop
+                self.waiting_room()
+            
         except Exception as e:
             print(f"[!] Launch failed: {e}")
 
@@ -382,8 +497,10 @@ class LobbyClient:
             return
 
         room_name = input("Room name: ").strip() or "Room"
-        max_players_str = input("Max players (default 2): ").strip()
-        max_players = int(max_players_str) if max_players_str.isdigit() else 2
+        
+        # Use max_players from game config
+        max_players = game.get("max_players", 2)
+        print(f"[*] This game supports up to {max_players} players.")
 
         send_json(self.sock, {
             "action": "create_room",
@@ -430,6 +547,21 @@ class LobbyClient:
             print(f"[!] You haven't downloaded this game yet.")
             print(f"    Please download it from the Game Store first.")
             return
+
+        # Check version compatibility - get server's current game version
+        send_json(self.sock, {"action": "get_game_info", "game_id": game_id})
+        game_resp = recv_json(self.sock)
+        if game_resp and game_resp.get("status") == "ok":
+            server_game = game_resp.get("game", {})
+            server_version = server_game.get("version")
+            local_version = self._get_installed_game_version(game_id)
+            
+            if server_version and local_version and server_version != local_version:
+                print(f"[!] Version mismatch!")
+                print(f"    Your version: {local_version}")
+                print(f"    Server version: {server_version}")
+                print(f"    Please re-download the game to get the latest version.")
+                return
 
         # Now actually join the room
         send_json(self.sock, {

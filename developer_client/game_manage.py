@@ -69,13 +69,13 @@ class GameManagerClient:
             return
         
         print(f"\nUpdating: {game['name']} (current version: {game['version']})")
-        print("Note: To update, you'll re-upload the game files.")
-        print("The game ID will remain the same, but version should be incremented.")
+        print("Select the new game folder to upload.")
+        print("The game name will remain the same. Enter a new version number.")
         
-        # Use uploader for actual upload
+        # Use uploader with update mode
         from .game_upload import GameUploader
         uploader = GameUploader(self.sock, self.username)
-        uploader.upload_game()
+        uploader.update_game(game)  # Pass existing game for update
 
     def delete_game(self) -> None:
         print("\n=== Delete (Unlist) Game ===")

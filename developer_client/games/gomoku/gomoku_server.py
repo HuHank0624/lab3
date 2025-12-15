@@ -301,6 +301,7 @@ def main():
     parser = argparse.ArgumentParser(description="Gomoku Game Server")
     parser.add_argument("--host", default="0.0.0.0", help="IP to bind")
     parser.add_argument("--port", type=int, required=True, help="Port to listen on")
+    parser.add_argument("--players", type=int, default=2, help="Number of players (ignored, always 2)")
     args = parser.parse_args()
 
     server = GomokuServer(args.host, args.port)
