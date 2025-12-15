@@ -291,11 +291,46 @@ class DataStore:
                     players = r.setdefault("players", [])
                     if username in players:
                         players.remove(username)
+                    # Also remove from ready list
+                    ready = r.setdefault("ready_players", [])
+                    if username in ready:
+                        ready.remove(username)
                     # destroy room if empty
                     if not players:
                         rooms.remove(r)
                     self.rooms.save()
                     return
+
+    def set_player_ready(self, room_id: str, username: str, ready: bool) -> bool:
+        """Set a player's ready status. Returns True if successful."""
+        with self.rooms.with_lock():
+            for r in self.rooms.data["rooms"]:
+                if r["room_id"] == room_id:
+                    players = r.get("players", [])
+                    if username not in players:
+                        return False
+                    ready_list = r.setdefault("ready_players", [])
+                    if ready:
+                        if username not in ready_list:
+                            ready_list.append(username)
+                    else:
+                        if username in ready_list:
+                            ready_list.remove(username)
+                    self.rooms.save()
+                    return True
+        return False
+
+    def are_all_players_ready(self, room_id: str) -> bool:
+        """Check if all players in room are ready."""
+        with self.rooms.with_lock():
+            for r in self.rooms.data["rooms"]:
+                if r["room_id"] == room_id:
+                    players = r.get("players", [])
+                    ready_list = r.get("ready_players", [])
+                    # All players (except host can start without being ready)
+                    # Actually let's require everyone to be ready
+                    return len(players) > 1 and set(players) == set(ready_list)
+        return False
 
     def delete_room(self, room_id: str) -> None:
         """Forcefully delete a room."""
