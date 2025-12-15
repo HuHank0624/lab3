@@ -19,7 +19,7 @@ class GamePlatformServer:
         self.datastore = DataStore()
         self.auth = AuthManager(self.datastore)
         self.games = GameManager(self.datastore)
-        self.lobby = LobbyManager(self.datastore)
+        self.lobby = LobbyManager(self.datastore, self.games)  # Pass game_manager for port management
         self.handlers = RequestHandlers(self.datastore, self.auth, self.games, self.lobby)
 
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -61,6 +61,7 @@ class GameManager:
         self.base_port = base_port
         self.port_lock = threading.Lock()
         self.next_port = base_port
+        self.used_ports: set = set()  # Track ports in use
 
     # ---------- Upload handling ----------
 
@@ -144,13 +145,43 @@ class GameManager:
     def allocate_game_port(self) -> int:
         """
         Allocate a unique TCP port for a game room.
-        Ports start from base_port (>= 10000).
+        Finds an available port starting from base_port.
         """
+        import socket
         with self.port_lock:
             port = self.next_port
-            self.next_port += 1
-        log(f"Allocated game port: {port}")
-        return port
+            max_attempts = 100
+            for _ in range(max_attempts):
+                if port not in self.used_ports and self._is_port_available(port):
+                    self.used_ports.add(port)
+                    self.next_port = port + 1
+                    log(f"Allocated game port: {port}")
+                    return port
+                port += 1
+            # Fallback: find any available port in range
+            for p in range(self.base_port, self.base_port + 1000):
+                if p not in self.used_ports and self._is_port_available(p):
+                    self.used_ports.add(p)
+                    log(f"Allocated game port: {p}")
+                    return p
+        raise RuntimeError("No available ports for game server")
+
+    def _is_port_available(self, port: int) -> bool:
+        """Check if a port is available for binding."""
+        import socket
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(('0.0.0.0', port))
+                return True
+        except OSError:
+            return False
+
+    def release_game_port(self, port: int) -> None:
+        """Release a port back to the pool when game ends."""
+        with self.port_lock:
+            self.used_ports.discard(port)
+            log(f"Released game port: {port}")
 
     # 🎯 說明：
     # 這個 GameManager 負責：

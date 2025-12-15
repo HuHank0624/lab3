@@ -1,20 +1,21 @@
 # path: server/lobby_manager.py
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 
 from .data import DataStore
 from .utils import log
-# server/lobby_manager.py
 from .game_runtime import GameRuntime
+
+if TYPE_CHECKING:
+    from .game_manager import GameManager
 
 
 class LobbyManager:
     """Room list / matchmaking view over DataStore."""
 
-    def __init__(self, datastore: DataStore):
+    def __init__(self, datastore: DataStore, game_manager: "GameManager" = None):
         self.datastore = datastore
         self.runtime = GameRuntime()
-
-        # For potential future: mapping room_id -> game server process/port etc.
+        self.game_manager = game_manager  # For port release
 
     def list_rooms(self) -> List[Dict[str, Any]]:
         return self.datastore.list_rooms()
@@ -88,6 +89,11 @@ class LobbyManager:
         if not room:
             return {"status": "error", "message": "Room not found"}
 
+        # Release the port
+        game_port = room.get("game_port")
+        if game_port and self.game_manager:
+            self.game_manager.release_game_port(game_port)
+
         # Stop game server if running
         if room_id in self.runtime.running_servers:
             proc = self.runtime.running_servers[room_id]
@@ -148,6 +154,11 @@ class LobbyManager:
         if username not in room.get("players", []):
             return {"status": "error", "message": "You are not in this room"}
         
+        # Release the port
+        game_port = room.get("game_port")
+        if game_port and self.game_manager:
+            self.game_manager.release_game_port(game_port)
+
         # Stop game server if running
         if room_id in self.runtime.running_servers:
             proc = self.runtime.running_servers[room_id]
