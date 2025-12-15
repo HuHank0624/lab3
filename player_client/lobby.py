@@ -231,6 +231,7 @@ class LobbyClient:
             # Check if game has started - auto-launch!
             if room.get("status") == "playing":
                 print("\n[!] Game has started! Launching game client...")
+                print(f"[DEBUG] Room info: status={room.get('status')}, game_port={room.get('game_port')}, game_id={room.get('game_id')}")
                 self._auto_launch_game(room)
                 return
 
@@ -405,6 +406,8 @@ class LobbyClient:
             self.current_room_id = resp.get("room_id")
             print(f"[OK] Room created! Room ID: {self.current_room_id}")
             print(f"     Game port: {resp.get('game_port')}")
+            print("[*] Entering waiting room...")
+            self.waiting_room()  # Auto-enter waiting room after creating
         else:
             print(f"[!] Failed to create room: {resp.get('message', 'Unknown error')}")
 
@@ -447,6 +450,8 @@ class LobbyClient:
         if resp and resp.get("status") == "ok":
             self.current_room_id = room_id
             print(f"[OK] Successfully joined room {room_id}")
+            print("[*] Entering waiting room...")
+            self.waiting_room()  # Auto-enter waiting room after joining
         else:
             print(f"[!] Failed to join: {resp.get('message', 'Unknown error')}")
 

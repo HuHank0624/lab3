@@ -80,20 +80,23 @@ class GameRuntime:
 
     def _find_server_entry(self, temp_dir: str, game: Dict[str, Any]) -> Optional[str]:
         """Find the server entry file in extracted game directory."""
-        # First try the explicit entry from game metadata
+        # FIRST: look for *server*.py (most reliable)
+        for root, dirs, files in os.walk(temp_dir):
+            for f in files:
+                if "server" in f.lower() and f.endswith(".py"):
+                    log(f"[GameRuntime] Found server entry: {f}")
+                    return os.path.join(root, f)
+        
+        # Fallback: try the explicit entry from game metadata (cli_entry)
+        # Note: cli_entry might point to client, so we try server first
         cli_entry = game.get("cli_entry", "")
-        if cli_entry:
+        if cli_entry and "server" in cli_entry.lower():
             for root, dirs, files in os.walk(temp_dir):
                 for f in files:
                     if f == cli_entry or f.endswith(cli_entry):
                         return os.path.join(root, f)
         
-        # Fallback: look for *server*.py
-        for root, dirs, files in os.walk(temp_dir):
-            for f in files:
-                if "server" in f.lower() and f.endswith(".py"):
-                    return os.path.join(root, f)
-        
+        log(f"[GameRuntime] No server entry found in {temp_dir}")
         return None
 
     def stop_game_server(self, room_id: str) -> bool:

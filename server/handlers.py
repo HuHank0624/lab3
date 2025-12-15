@@ -27,7 +27,12 @@ class RequestHandlers:
     def handle(self, sock, conn_id: int, msg: Dict[str, Any]) -> None:
         try:
             action = msg.get("action")
-            log(f"[conn {conn_id}] action={action} payload={msg}")
+            # Truncate data field for upload chunks to avoid flooding logs
+            if action == "upload_game_chunk":
+                log_msg = {k: (v[:50] + "..." if k == "data" and len(v) > 50 else v) for k, v in msg.items()}
+                log(f"[conn {conn_id}] action={action} payload={log_msg}")
+            else:
+                log(f"[conn {conn_id}] action={action} payload={msg}")
 
             if action == "register":
                 self._handle_register(sock, msg)
