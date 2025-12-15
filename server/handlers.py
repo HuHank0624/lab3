@@ -155,6 +155,7 @@ class RequestHandlers:
         description = msg.get("description", "").strip()
         cli_entry = msg.get("cli_entry", "").strip()
         gui_entry = msg.get("gui_entry", "").strip()
+        max_players = int(msg.get("max_players", 2))
 
         if not name or not version:
             send_error(sock, "name and version are required")
@@ -167,6 +168,7 @@ class RequestHandlers:
             description=description,
             cli_entry=cli_entry,
             gui_entry=gui_entry,
+            max_players=max_players,
         )
         send_ok(sock, upload_id=upload_id, chunk_size=chunk_size)
 

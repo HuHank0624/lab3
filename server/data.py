@@ -125,6 +125,7 @@ class DataStore:
         file_path: str,
         cli_entry: str,
         gui_entry: str,
+        max_players: int = 2,
         game_id: Optional[str] = None,
     ) -> str:
         """If game_id is None, create; else update existing."""
@@ -146,6 +147,7 @@ class DataStore:
                     "file_path": file_path,
                     "cli_entry": cli_entry,
                     "gui_entry": gui_entry,
+                    "max_players": max_players,
                     "downloads": 0,
                     "reviews": [],
                 }
@@ -164,11 +166,12 @@ class DataStore:
                         "file_path": file_path,
                         "cli_entry": cli_entry,
                         "gui_entry": gui_entry,
+                        "max_players": max_players,
                     }
                 )
             self.games.save()
             self.users.save()
-        log(f"Game saved: {name} ({game_id}) v{version}")
+        log(f"Game saved: {name} ({game_id}) v{version} max_players={max_players}")
         return game_id
 
     def increment_download(self, username: str, game_id: str) -> None:

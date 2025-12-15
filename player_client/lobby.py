@@ -365,7 +365,8 @@ class LobbyClient:
         print(f"[*] Launching game: {' '.join(cmd)}")
         
         try:
-            subprocess.Popen(cmd)
+            # Redirect stdout/stderr to DEVNULL so game output doesn't clutter the lobby terminal
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             print("[OK] Game launched!")
         except Exception as e:
             print(f"[!] Launch failed: {e}")
@@ -606,7 +607,8 @@ class LobbyClient:
         print(f"[*] Launching game: {' '.join(cmd)}")
         
         try:
-            subprocess.Popen(cmd)
+            # Redirect stdout/stderr to DEVNULL so game output doesn't clutter the lobby terminal
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             print("[OK] Game launched!")
         except Exception as e:
             print(f"[!] Launch failed: {e}")

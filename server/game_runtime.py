@@ -71,6 +71,18 @@ class GameRuntime:
             )
             
             self.running_servers[room_id] = proc
+            
+            # Give the server a moment to start and bind to the port
+            import time
+            time.sleep(0.5)
+            
+            # Check if the process is still running
+            if proc.poll() is not None:
+                # Process exited - something went wrong
+                stderr = proc.stderr.read().decode() if proc.stderr else ""
+                log(f"[GameRuntime] Game server failed to start: {stderr}")
+                return False
+            
             log(f"[GameRuntime] Game server started for room {room_id} on port {port}, PID={proc.pid}")
             return True
 

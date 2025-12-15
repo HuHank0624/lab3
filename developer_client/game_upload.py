@@ -90,6 +90,11 @@ class GameUploader:
         client_input = input(f"Client Entry [{client_entry}]: ").strip()
         client_entry = client_input if client_input else client_entry
 
+        # Max players (for multiplayer games)
+        max_players_input = input("Max Players (default 2): ").strip()
+        max_players = int(max_players_input) if max_players_input.isdigit() else 2
+        max_players = max(2, min(max_players, 8))  # Clamp between 2-8
+
         if not all([name, version, description, server_entry, client_entry]):
             print("❌ All fields are required.")
             return None
@@ -100,6 +105,7 @@ class GameUploader:
             "description": description,
             "server_entry": server_entry,
             "client_entry": client_entry,
+            "max_players": max_players,
         }
 
     # ------------------------------------------------------------
@@ -201,6 +207,7 @@ class GameUploader:
             "description": info["description"],
             "cli_entry": info["client_entry"],
             "gui_entry": info["server_entry"],
+            "max_players": info.get("max_players", 2),
         })
 
         resp = recv_json(self.sock)

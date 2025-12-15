@@ -21,6 +21,7 @@ class UploadSession:
         cli_entry: str,
         gui_entry: str,
         target_path: str,
+        max_players: int = 2,
     ):
         self.upload_id = upload_id
         self.developer = developer
@@ -30,6 +31,7 @@ class UploadSession:
         self.cli_entry = cli_entry
         self.gui_entry = gui_entry
         self.target_path = target_path
+        self.max_players = max_players
         self.file = open(target_path, "wb")
         self.lock = threading.Lock()
         self.finished = False
@@ -68,6 +70,7 @@ class GameManager:
         description: str,
         cli_entry: str,
         gui_entry: str,
+        max_players: int = 2,
     ) -> Tuple[str, int, str]:
         """
         Create a new upload session.
@@ -88,6 +91,7 @@ class GameManager:
             cli_entry=cli_entry,
             gui_entry=gui_entry,
             target_path=target_path,
+            max_players=max_players,
         )
         with self.uploads_lock:
             self.uploads[upload_id] = sess
@@ -111,6 +115,7 @@ class GameManager:
                 file_path=sess.target_path,
                 cli_entry=sess.cli_entry,
                 gui_entry=sess.gui_entry,
+                max_players=sess.max_players,
             )
             # after finalize, remove from active uploads
             with self.uploads_lock:

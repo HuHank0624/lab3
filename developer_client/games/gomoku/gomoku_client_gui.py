@@ -253,20 +253,17 @@ class GomokuGUI:
     def handle_message(self, msg: Dict[str, Any]):
         """Handle a message from server."""
         mtype = msg.get("type")
-        print(f"[DEBUG] Received message type: {mtype}, content: {msg}")
 
         if mtype == "welcome":
             self.player_index = msg.get("player_index")
             self.symbol = msg.get("symbol", "X")
             self.board_size = msg.get("board_size", 15)
-            print(f"[DEBUG] Welcome - player_index={self.player_index}, symbol={self.symbol}")
             self.update_status(f"You are Player {self.player_index + 1} ({self.symbol})")
 
         elif mtype == "start":
             self.board = msg.get("board", self.board)
             self.your_turn = bool(msg.get("your_turn", False))
             self.game_started = True
-            print(f"[DEBUG] Start - your_turn={self.your_turn}")
             self._redraw_stones()
             self.update_turn()
             self.update_status("Game started!")
@@ -303,9 +300,11 @@ class GomokuGUI:
                 messagebox.showinfo("Game Over", "It's a draw!")
 
         elif mtype == "opponent_quit":
-            self.game_over = True
-            self.update_status("Opponent left")
-            messagebox.showinfo("Game Over", "Opponent left the game. You win by default!")
+            # Only show "opponent left" message if game wasn't already over
+            if not self.game_over:
+                self.game_over = True
+                self.update_status("Opponent left")
+                messagebox.showinfo("Game Over", "Opponent left the game. You win by default!")
 
         elif mtype == "error":
             messagebox.showerror("Error", msg.get("message", "Unknown error"))

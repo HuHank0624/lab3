@@ -302,8 +302,13 @@ class TetrisGUI:
     def connect_and_run(self):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.settimeout(10)  # 10 second timeout for connection
+            self.status_label.config(text="Connecting...")
+            self.root.update()
+            
             self.sock.connect((self.host, self.port))
-            self.status_label.config(text="Connected! Waiting...")
+            self.sock.settimeout(None)  # Remove timeout after connection
+            self.status_label.config(text="Connected! Waiting for players...")
             
             send_json(self.sock, {
                 "type": "join",
@@ -315,8 +320,11 @@ class TetrisGUI:
             
             self.root.mainloop()
             
+        except socket.timeout:
+            messagebox.showerror("Error", f"Connection timed out to {self.host}:{self.port}")
+            self.root.destroy()
         except ConnectionRefusedError:
-            messagebox.showerror("Error", f"Cannot connect to {self.host}:{self.port}")
+            messagebox.showerror("Error", f"Cannot connect to {self.host}:{self.port}\nMake sure the game server is running.")
             self.root.destroy()
         except Exception as e:
             messagebox.showerror("Error", str(e))

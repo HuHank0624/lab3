@@ -30,6 +30,16 @@ class LobbyManager:
         max_players: int,
         game_port: int,
     ) -> Dict[str, Any]:
+        # Validate max_players against game's limit
+        game = self.datastore.get_game(game_id)
+        if game:
+            game_max_players = game.get("max_players", 2)
+            if max_players > game_max_players:
+                return {
+                    "status": "error",
+                    "message": f"This game supports at most {game_max_players} players"
+                }
+        
         room_id = self.datastore.create_room(
             room_name=room_name,
             host=host_username,

@@ -267,7 +267,7 @@ class TetrisServer:
 
     def start(self):
         self.sock.bind((self.host, self.port))
-        self.sock.listen()
+        self.sock.listen(5)
         print(f"[TetrisServer] Listening on {self.host}:{self.port}")
         print("Waiting for 2 players...")
         
