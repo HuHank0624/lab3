@@ -1,7 +1,0 @@
-{
-  "name": "g",
-  "version": "1",
-  "description": "g",
-  "server_entry": "gomoku_server.py",
-  "client_entry": "gomoku_client.py"
-}
