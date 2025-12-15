@@ -183,23 +183,17 @@ class LobbyClient:
         room = resp.get("room", {})
         ready_players = room.get("ready_players", [])
         
-        # Toggle
-        if self.username in ready_players:
-            # Unready
-            send_json(self.sock, {"action": "unready", "room_id": self.current_room_id})
-            resp = recv_json(self.sock)
-            if resp.get("status") == "ok":
-                print("[OK] You are now NOT READY")
-            else:
-                print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
-        else:
-            # Ready
-            send_json(self.sock, {"action": "ready", "room_id": self.current_room_id})
-            resp = recv_json(self.sock)
-            if resp.get("status") == "ok":
+        # Toggle: determine new state and use set_ready
+        new_ready = self.username not in ready_players
+        send_json(self.sock, {"action": "set_ready", "room_id": self.current_room_id, "ready": new_ready})
+        resp = recv_json(self.sock)
+        if resp.get("status") == "ok":
+            if new_ready:
                 print("[OK] You are now READY!")
             else:
-                print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
+                print("[OK] You are now NOT READY")
+        else:
+            print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
 
     def waiting_room(self) -> None:
         """Enter the waiting room - shows room status, allows ready toggle, and auto-launches when game starts."""
@@ -301,20 +295,16 @@ class LobbyClient:
         ready_players = room.get("ready_players", [])
         
         # Toggle
-        if self.username in ready_players:
-            send_json(self.sock, {"action": "unready", "room_id": self.current_room_id})
-            resp = recv_json(self.sock)
-            if resp.get("status") == "ok":
-                print("[OK] You are now NOT READY")
-            else:
-                print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
-        else:
-            send_json(self.sock, {"action": "ready", "room_id": self.current_room_id})
-            resp = recv_json(self.sock)
-            if resp.get("status") == "ok":
+        new_ready = self.username not in ready_players
+        send_json(self.sock, {"action": "set_ready", "room_id": self.current_room_id, "ready": new_ready})
+        resp = recv_json(self.sock)
+        if resp.get("status") == "ok":
+            if new_ready:
                 print("[OK] You are now READY!")
             else:
-                print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
+                print("[OK] You are now NOT READY")
+        else:
+            print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
 
     def _do_start_game(self) -> None:
         """Internal: start game without prompts."""
