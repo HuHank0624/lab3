@@ -74,6 +74,12 @@ class RequestHandlers:
             elif action == "leave_room" and role == "player":
                 self._handle_leave_room(sock, username, msg)
 
+            elif action == "ready" and role == "player":
+                self._handle_ready(sock, username, msg)
+
+            elif action == "unready" and role == "player":
+                self._handle_unready(sock, username, msg)
+
             elif action == "close_room" and role == "player":
                 self._handle_close_room(sock, username, msg)
 
@@ -265,6 +271,46 @@ class RequestHandlers:
 
         self.lobby.leave_room(room_id, username)
         send_ok(sock)
+
+    def _handle_ready(self, sock, username: str, msg: Dict[str, Any]) -> None:
+        room_id = msg.get("room_id")
+        if not room_id:
+            send_error(sock, "room_id required")
+            return
+
+        room = self.datastore.get_room(room_id)
+        if not room:
+            send_error(sock, "Room not found")
+            return
+        if username not in room.get("players", []):
+            send_error(sock, "You are not in this room")
+            return
+
+        if self.datastore.set_player_ready(room_id, username, True):
+            room = self.datastore.get_room(room_id)  # Refetch
+            send_ok(sock, room_info=room)
+        else:
+            send_error(sock, "Failed to set ready status")
+
+    def _handle_unready(self, sock, username: str, msg: Dict[str, Any]) -> None:
+        room_id = msg.get("room_id")
+        if not room_id:
+            send_error(sock, "room_id required")
+            return
+
+        room = self.datastore.get_room(room_id)
+        if not room:
+            send_error(sock, "Room not found")
+            return
+        if username not in room.get("players", []):
+            send_error(sock, "You are not in this room")
+            return
+
+        if self.datastore.set_player_ready(room_id, username, False):
+            room = self.datastore.get_room(room_id)  # Refetch
+            send_ok(sock, room_info=room)
+        else:
+            send_error(sock, "Failed to set unready status")
 
     def _handle_close_room(self, sock, username: str, msg: Dict[str, Any]) -> None:
         room_id = msg.get("room_id")
