@@ -8,7 +8,6 @@ from .data import DataStore
 from .game_manager import GameManager
 from .lobby_manager import LobbyManager
 from .handlers import RequestHandlers
-from .room_subscriptions import RoomSubscriptionManager
 from .utils import *
 from utils.protocol import recv_json
 
@@ -21,8 +20,7 @@ class GamePlatformServer:
         self.auth = AuthManager(self.datastore)
         self.games = GameManager(self.datastore)
         self.lobby = LobbyManager(self.datastore)
-        self.subscriptions = RoomSubscriptionManager()
-        self.handlers = RequestHandlers(self.datastore, self.auth, self.games, self.lobby, self.subscriptions)
+        self.handlers = RequestHandlers(self.datastore, self.auth, self.games, self.lobby)
 
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -57,7 +55,6 @@ class GamePlatformServer:
         except ConnectionError:
             log(f"Connection error from {addr}")
         finally:
-            self.subscriptions.unsubscribe(sock)
             self.auth.logout(conn_id)
             sock.close()
 
