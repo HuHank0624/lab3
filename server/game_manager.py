@@ -49,7 +49,7 @@ class UploadSession:
 class GameManager:
     """Handle game metadata and upload sessions."""
 
-    def __init__(self, datastore: DataStore, base_port: int = 10002):
+    def __init__(self, datastore: DataStore, base_port: int = 12000):
         self.datastore = datastore
         self.uploads: Dict[str, UploadSession] = {}
         self.uploads_lock = threading.Lock()

@@ -108,8 +108,8 @@ class LobbyClient:
             print("3. Join room")
             print("4. Leave room")
             print("5. Ready / Unready")
-            print("6. Start game (host only, all must be ready)")
-            print("7. Launch game client")
+            print("6. Start game (host only, auto-launches for all)")
+            print("7. Launch game client (if not auto-launched)")
             print("8. Close room (host only)")
             print("0. Back to main menu")
             choice = input("> ").strip()
@@ -537,7 +537,10 @@ class LobbyClient:
         game_port = resp.get("game_port")
 
         print(f"[OK] Game server started on port {game_port}")
-        print(f"    All players in the room can now use option 6 to launch the game client.")
+        print(f"    Launching game client...")
+        
+        # Auto-launch game client for host
+        self._auto_launch_game(room_info)
 
     def launch_game_client(self) -> None:
         """Launch game client to connect to the game server. Used by ALL players after host starts the game."""
