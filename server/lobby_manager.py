@@ -100,22 +100,14 @@ class LobbyManager:
         if room.get("host") != username:
             return {"status": "error", "message": "Only the host can start the game"}
         
-        # Check if all players are ready
-        if not self.datastore.are_all_players_ready(room_id):
-            players = room.get("players", [])
-            ready_players = room.get("ready_players", [])
-            not_ready = [p for p in players if p not in ready_players]
-            return {"status": "error", "message": f"Not all players are ready. Waiting for: {', '.join(not_ready)}"}
-
-        # Check if all players are ready
+        # Check player count
         players = room.get("players", [])
-        ready_players = room.get("ready_players", [])
-        
         if len(players) < 2:
             return {"status": "error", "message": "Need at least 2 players to start"}
         
-        # All players must be ready
-        if set(players) != set(ready_players):
+        # Check if all players are ready
+        if not self.datastore.are_all_players_ready(room_id):
+            ready_players = room.get("ready_players", [])
             not_ready = [p for p in players if p not in ready_players]
             return {"status": "error", "message": f"Not all players are ready. Waiting for: {', '.join(not_ready)}"}
 

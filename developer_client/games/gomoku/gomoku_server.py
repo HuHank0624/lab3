@@ -206,10 +206,13 @@ class GomokuServer:
         with self.lock:
             self.game_started = True
         print("[GomokuServer] Two players ready. Starting game.")
+        print(f"[GomokuServer] Current player (first turn): {self.game.current_player}")
         for idx, sock in enumerate(self.clients):
+            your_turn = (idx == self.game.current_player)
+            print(f"[GomokuServer] Sending start to player {idx}, your_turn={your_turn}")
             send_json(sock, {
                 "type": "start",
-                "your_turn": (idx == self.game.current_player),
+                "your_turn": your_turn,
                 "board": self.game.serialize_board(),
             })
 
