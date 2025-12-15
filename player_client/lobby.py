@@ -102,12 +102,17 @@ class LobbyClient:
 
     def lobby_menu(self) -> None:
         while True:
+            # Show current room status
+            if self.current_room_id:
+                print(f"\n[Current Room: {self.current_room_id}]")
+            
             print("\n=== Game Lobby ===")
             print("1. View room list")
             print("2. Create new room")
             print("3. Join room")
             print("4. Enter waiting room (after joining)")
-            print("5. Close room (host only)")
+            print("5. Leave room")
+            print("6. Close room (host only, auto-leaves)")
             print("0. Back to main menu")
             choice = input("> ").strip()
 
@@ -122,6 +127,8 @@ class LobbyClient:
             elif choice == "4":
                 self.waiting_room()
             elif choice == "5":
+                self.leave_room()
+            elif choice == "6":
                 self.close_room()
             else:
                 print("Invalid option.")
@@ -191,14 +198,12 @@ class LobbyClient:
 
     def waiting_room(self) -> None:
         """Enter the waiting room - shows room status, allows ready toggle, and auto-launches when game starts."""
-        import time
-        
         if not self.current_room_id:
             print("[!] You are not in a room. Join a room first.")
             return
 
         print("\n=== Waiting Room ===")
-        print("Commands: 'r' = toggle ready, 's' = start game (host only), 'q' = quit waiting room")
+        print("Commands: 'r' = toggle ready, 's' = start game (host only), 'q' = quit waiting room, '' (enter) = refresh")
         print("The game client will auto-launch when the host starts the game!\n")
 
         while True:
@@ -230,7 +235,7 @@ class LobbyClient:
             is_host = room.get("host") == self.username
             my_ready = self.username in ready_players
             
-            print(f"\r--- Room: {room.get('room_name', 'Unknown')} ---")
+            print(f"--- Room: {room.get('room_name', 'Unknown')} ---")
             print(f"Game: {room.get('game_id', 'Unknown')[:8]}...")
             print(f"Players ({len(players)}/{room.get('max_players', 2)}):")
             for p in players:
@@ -242,7 +247,7 @@ class LobbyClient:
             print(f"\nReady: {len(ready_players)}/{len(players)}")
             
             # Show available actions
-            print("\n[r] Toggle Ready" + (f" (currently: {'READY' if my_ready else 'NOT READY'})" ))
+            print(f"\n[r] Toggle Ready (currently: {'READY' if my_ready else 'NOT READY'})")
             if is_host:
                 all_ready = len(ready_players) == len(players) and len(players) >= 2
                 if all_ready:
@@ -250,45 +255,18 @@ class LobbyClient:
                 else:
                     print("[s] Start Game (waiting for all players to be ready)")
             print("[q] Quit waiting room")
+            print("[Enter] Refresh status")
             
-            # Get user input with timeout for polling
-            print("\nEnter command (or wait for game to start): ", end="", flush=True)
-            
-            # Simple polling approach - wait for input or check status
-            import select
-            import sys as sys_module
-            
-            # On Windows, we can't use select on stdin, so use a simple approach
-            try:
-                # Try to read input with a timeout simulation
-                import msvcrt
-                start_time = time.time()
-                user_input = ""
-                while (time.time() - start_time) < 3:  # 3 second timeout
-                    if msvcrt.kbhit():
-                        char = msvcrt.getwch()
-                        if char == '\r':  # Enter key
-                            print()  # Newline
-                            break
-                        user_input += char
-                        print(char, end="", flush=True)
-                    time.sleep(0.1)
-                else:
-                    print()  # Newline after timeout
-            except ImportError:
-                # On non-Windows, use simple input with note about polling
-                user_input = input()
-            
-            user_input = user_input.strip().lower()
+            user_input = input("\n> ").strip().lower()
             
             if user_input == 'q':
                 print("[*] Leaving waiting room (you're still in the room)")
                 return
             elif user_input == 'r':
-                self.toggle_ready()
+                self._do_toggle_ready()
             elif user_input == 's':
                 if is_host:
-                    self.start_game()
+                    self._do_start_game()
                     # Check if game started successfully
                     send_json(self.sock, {"action": "get_room_info", "room_id": self.current_room_id})
                     check_resp = recv_json(self.sock)
@@ -300,8 +278,49 @@ class LobbyClient:
                             return
                 else:
                     print("[!] Only the host can start the game.")
+            # Empty input or anything else just refreshes
             
-            print("\n" + "="*40)
+            print("\n" + "="*40 + "\n")
+
+    def _do_toggle_ready(self) -> None:
+        """Internal: toggle ready status without room check."""
+        send_json(self.sock, {"action": "get_room_info", "room_id": self.current_room_id})
+        resp = recv_json(self.sock)
+        
+        if resp.get("status") != "ok":
+            print(f"[!] Failed to get room info: {resp.get('message', 'Unknown error')}")
+            return
+
+        room = resp.get("room", {})
+        ready_players = room.get("ready_players", [])
+        
+        # Toggle
+        if self.username in ready_players:
+            send_json(self.sock, {"action": "unready", "room_id": self.current_room_id})
+            resp = recv_json(self.sock)
+            if resp.get("status") == "ok":
+                print("[OK] You are now NOT READY")
+            else:
+                print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
+        else:
+            send_json(self.sock, {"action": "ready", "room_id": self.current_room_id})
+            resp = recv_json(self.sock)
+            if resp.get("status") == "ok":
+                print("[OK] You are now READY!")
+            else:
+                print(f"[!] Failed: {resp.get('message', 'Unknown error')}")
+
+    def _do_start_game(self) -> None:
+        """Internal: start game without prompts."""
+        send_json(self.sock, {"action": "start_game", "room_id": self.current_room_id})
+        resp = recv_json(self.sock)
+
+        if resp.get("status") != "ok":
+            print(f"[!] Failed to start: {resp.get('message', 'Unknown error')}")
+            return
+
+        game_port = resp.get("game_port")
+        print(f"[OK] Game server started on port {game_port}")
 
     def _auto_launch_game(self, room: Dict[str, Any]) -> None:
         """Auto-launch game client when game starts."""
@@ -449,21 +468,36 @@ class LobbyClient:
             print(f"[!] Failed to leave: {resp.get('message', 'Unknown error')}")
 
     def close_room(self) -> None:
-        """Close/delete a room (host only). Useful when game ends or has issues."""
-        if self.current_room_id:
+        """Close/delete a room (host only). Auto-finds room where user is host."""
+        room_id = None
+        
+        # First, try to find a room where this user is host
+        rooms = self._fetch_rooms()
+        for r in rooms:
+            if r.get("host") == self.username:
+                room_id = r.get("room_id")
+                print(f"[*] Found your room: {r.get('room_name')} ({room_id})")
+                break
+        
+        # If not found via host check, use current room
+        if not room_id and self.current_room_id:
             room_id = self.current_room_id
-            print(f"Using current room: {room_id}")
-        else:
+            print(f"[*] Using current room: {room_id}")
+        
+        # If still not found, ask user
+        if not room_id:
             room_id = input("Enter room_id to close: ").strip()
 
         if not room_id:
+            print("[!] No room to close.")
             return
 
         send_json(self.sock, {"action": "close_room", "room_id": room_id})
         resp = recv_json(self.sock)
 
         if resp and resp.get("status") == "ok":
-            print(f"[OK] Room {room_id} closed.")
+            print(f"[OK] Room {room_id} closed and you have left.")
+            # Always clear current_room_id when closing
             if self.current_room_id == room_id:
                 self.current_room_id = None
         else:

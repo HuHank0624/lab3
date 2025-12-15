@@ -124,6 +124,7 @@ class GomokuServer:
         self.names: List[str] = ["Player0", "Player1"]
         self.lock = threading.Lock()
         self.game_started = False
+        self.connections_count = 0  # Track accepted connections
 
     def start(self):
         self.sock.bind((self.host, self.port))
@@ -131,16 +132,18 @@ class GomokuServer:
         print(f"[GomokuServer] Listening on {self.host}:{self.port}")
         print("Waiting for 2 players to join...")
 
-        # accept in main thread for exactly 2 players
-        while len(self.clients) < 2:
+        # Accept exactly 2 connections
+        while self.connections_count < 2:
             client_sock, addr = self.sock.accept()
-            print(f"[GomokuServer] New connection from {addr}")
+            self.connections_count += 1
+            print(f"[GomokuServer] New connection from {addr} ({self.connections_count}/2)")
             t = threading.Thread(target=self.handle_client_join, args=(client_sock,), daemon=True)
             t.start()
 
-        # Wait until both registered
+        # Wait until game actually started (both players sent join message)
+        import time
         while not self.game_started:
-            pass
+            time.sleep(0.1)
 
         print("[GomokuServer] Game started. Waiting for moves...")
         # Just wait; threads handle gameplay.
@@ -150,6 +153,7 @@ class GomokuServer:
                 if self.game.winner is not None:
                     # let threads finish; server can be closed by Ctrl+C
                     pass
+                time.sleep(0.1)
         except KeyboardInterrupt:
             print("[GomokuServer] Shutting down.")
         finally:
@@ -165,6 +169,7 @@ class GomokuServer:
                 return
             player_name = msg.get("player_name", "Anonymous")
 
+            should_start = False
             with self.lock:
                 if len(self.clients) >= 2:
                     send_json(sock, {"type": "error", "message": "Game already has two players"})
@@ -173,6 +178,10 @@ class GomokuServer:
                 player_index = len(self.clients)
                 self.clients.append(sock)
                 self.names[player_index] = player_name
+                
+                # Check if we should start the game (inside lock)
+                if len(self.clients) == 2 and not self.game_started:
+                    should_start = True
 
             symbol = "X" if player_index == 0 else "O"
             send_json(sock, {
@@ -183,7 +192,7 @@ class GomokuServer:
             })
             print(f"[GomokuServer] Player {player_index} ({player_name}) joined.")
 
-            if len(self.clients) == 2 and not self.game_started:
+            if should_start:
                 self.start_game()
 
             # now handle gameplay messages
