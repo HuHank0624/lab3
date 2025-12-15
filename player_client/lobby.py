@@ -197,11 +197,35 @@ class LobbyClient:
             print(f"[!] Failed to create room: {resp.get('message', 'Unknown error')}")
 
     def join_room(self) -> None:
+        # Check if already in a room
+        if self.current_room_id:
+            print(f"[!] You are already in room {self.current_room_id}")
+            print("    Please leave current room first (option 4).")
+            return
+
         self.show_rooms()
         room_id = input("\nEnter room_id to join: ").strip()
         if not room_id:
             return
 
+        # First, get room info to check the game_id
+        send_json(self.sock, {"action": "get_room_info", "room_id": room_id})
+        info_resp = recv_json(self.sock)
+        
+        if not info_resp or info_resp.get("status") != "ok":
+            print(f"[!] Room not found: {room_id}")
+            return
+        
+        room_info = info_resp.get("room", {})
+        game_id = room_info.get("game_id")
+        
+        # Check if game is installed BEFORE joining
+        if game_id and not self._is_game_installed(game_id):
+            print(f"[!] You haven't downloaded this game yet.")
+            print(f"    Please download it from the Game Store first.")
+            return
+
+        # Now actually join the room
         send_json(self.sock, {
             "action": "join_room",
             "room_id": room_id,
@@ -210,13 +234,7 @@ class LobbyClient:
         
         if resp and resp.get("status") == "ok":
             self.current_room_id = room_id
-            room_info = resp.get("room_info", {})
-            game_id = room_info.get("game_id")
             print(f"[OK] Successfully joined room {room_id}")
-            
-            # Check if game is installed
-            if game_id and not self._is_game_installed(game_id):
-                print(f"[!] Note: Game not downloaded yet. Please download before game starts.")
         else:
             print(f"[!] Failed to join: {resp.get('message', 'Unknown error')}")
 
@@ -282,47 +300,12 @@ class LobbyClient:
 
         room_info = resp.get("room_info", {})
         game_port = resp.get("game_port")
-        game_id = room_info.get("game_id")
 
-        print(f"[OK] Game starting on port {game_port}")
-
-        # Find local game directory
-        game_dir = self._get_game_dir(game_id)
-        if not game_dir:
-            print("[!] Game not downloaded, cannot launch client")
-            return
-
-        # Find client entry
-        entry = None
-        for root, dirs, files in os.walk(game_dir):
-            for f in files:
-                if "client" in f.lower() and f.endswith(".py"):
-                    entry = os.path.join(root, f)
-                    break
-            if entry:
-                break
-
-        if not entry:
-            print("[!] Cannot find client entry file")
-            return
-
-        # Launch game client - use SERVER_HOST from config
-        cmd = [
-            sys.executable, entry,
-            "--host", SERVER_HOST,
-            "--port", str(game_port),
-            "--name", self.username
-        ]
-        print(f"[*] Launching game: {' '.join(cmd)}")
-        
-        try:
-            subprocess.Popen(cmd)
-            print("[OK] Game launched!")
-        except Exception as e:
-            print(f"[!] Launch failed: {e}")
+        print(f"[OK] Game server started on port {game_port}")
+        print(f"    All players in the room can now use option 6 to launch the game client.")
 
     def launch_game_client(self) -> None:
-        """For non-host players to launch game client after host starts."""
+        """Launch game client to connect to the game server. Used by ALL players after host starts the game."""
         if self.current_room_id:
             room_id = self.current_room_id
             print(f"Using current room: {room_id}")
@@ -361,19 +344,27 @@ class LobbyClient:
             print("[!] Game not downloaded, cannot launch client")
             return
 
-        # Find client entry
-        entry = None
+        # Find client entry - prefer GUI client if available
+        gui_entry = None
+        cli_entry = None
+        
         for root, dirs, files in os.walk(game_dir):
             for f in files:
-                if "client" in f.lower() and f.endswith(".py"):
-                    entry = os.path.join(root, f)
-                    break
-            if entry:
-                break
+                if f.endswith(".py"):
+                    fpath = os.path.join(root, f)
+                    if "client" in f.lower() and "gui" in f.lower():
+                        gui_entry = fpath
+                    elif "client" in f.lower():
+                        cli_entry = fpath
+        
+        entry = gui_entry or cli_entry
 
         if not entry:
             print("[!] Cannot find client entry file")
             return
+
+        client_type = "GUI" if gui_entry else "CLI"
+        print(f"[*] Using {client_type} client: {os.path.basename(entry)}")
 
         # Launch game client - use SERVER_HOST from config
         cmd = [
