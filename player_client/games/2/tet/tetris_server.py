@@ -260,7 +260,6 @@ class TetrisServer:
         self.lock = threading.Lock()
         self.game_started = False
         self.game_over = False
-        self.connections_count = 0  # Track accepted connections
         
         # Game tick rate (seconds between auto-drops)
         self.tick_rate = 0.5
@@ -271,11 +270,10 @@ class TetrisServer:
         print(f"[TetrisServer] Listening on {self.host}:{self.port}")
         print("Waiting for 2 players...")
         
-        # Accept exactly 2 connections
-        while self.connections_count < 2:
+        # Accept 2 players
+        while len(self.players) < 2:
             client_sock, addr = self.sock.accept()
-            self.connections_count += 1
-            print(f"[TetrisServer] Connection from {addr} ({self.connections_count}/2)")
+            print(f"[TetrisServer] Connection from {addr}")
             t = threading.Thread(target=self.handle_join, args=(client_sock,), daemon=True)
             t.start()
         
@@ -305,7 +303,6 @@ class TetrisServer:
             
             name = msg.get("player_name", "Player")
             
-            should_start = False
             with self.lock:
                 if len(self.players) >= 2:
                     send_json(sock, {"type": "error", "message": "Game full"})
@@ -315,10 +312,6 @@ class TetrisServer:
                 player_id = len(self.players)
                 player = TetrisPlayer(player_id, sock, name)
                 self.players[player_id] = player
-                
-                # Check if we should start (inside lock)
-                if len(self.players) == 2 and not self.game_started:
-                    should_start = True
             
             send_json(sock, {
                 "type": "welcome",
@@ -329,7 +322,7 @@ class TetrisServer:
             })
             print(f"[TetrisServer] Player {player_id} ({name}) joined")
             
-            if should_start:
+            if len(self.players) == 2:
                 self.start_game()
             
             # Handle player input
