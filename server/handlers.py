@@ -74,6 +74,9 @@ class RequestHandlers:
             elif action == "leave_room" and role == "player":
                 self._handle_leave_room(sock, username, msg)
 
+            elif action == "set_ready" and role == "player":
+                self._handle_set_ready(sock, username, msg)
+
             elif action == "close_room" and role == "player":
                 self._handle_close_room(sock, username, msg)
 
@@ -265,6 +268,19 @@ class RequestHandlers:
 
         self.lobby.leave_room(room_id, username)
         send_ok(sock)
+
+    def _handle_set_ready(self, sock, username: str, msg: Dict[str, Any]) -> None:
+        room_id = msg.get("room_id")
+        ready = msg.get("ready", True)
+        if not room_id:
+            send_error(sock, "room_id required")
+            return
+
+        resp = self.lobby.set_ready(room_id, username, ready)
+        if resp["status"] == "ok":
+            send_json(sock, {"status": "ok", "ready": resp["ready"]})
+        else:
+            send_error(sock, resp["message"])
 
     def _handle_close_room(self, sock, username: str, msg: Dict[str, Any]) -> None:
         room_id = msg.get("room_id")

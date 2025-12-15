@@ -259,6 +259,7 @@ class DataStore:
                     "host": host,
                     "game_id": game_id,
                     "players": [host],
+                    "ready_players": [],  # Players who clicked ready
                     "max_players": max_players,
                     "status": "waiting",
                     "game_port": game_port,
@@ -313,3 +314,32 @@ class DataStore:
                     r["status"] = status
                     self.rooms.save()
                     return
+
+    def set_player_ready(self, room_id: str, username: str, ready: bool) -> bool:
+        """Set a player's ready status. Returns True if successful."""
+        with self.rooms.with_lock():
+            for r in self.rooms.data["rooms"]:
+                if r["room_id"] == room_id:
+                    if username not in r.get("players", []):
+                        return False
+                    ready_players = r.setdefault("ready_players", [])
+                    if ready:
+                        if username not in ready_players:
+                            ready_players.append(username)
+                    else:
+                        if username in ready_players:
+                            ready_players.remove(username)
+                    self.rooms.save()
+                    return True
+        return False
+
+    def are_all_players_ready(self, room_id: str) -> bool:
+        """Check if all players in the room are ready."""
+        with self.rooms.with_lock():
+            for r in self.rooms.data["rooms"]:
+                if r["room_id"] == room_id:
+                    players = r.get("players", [])
+                    ready_players = r.get("ready_players", [])
+                    # All players must be ready (including host)
+                    return len(players) >= 2 and set(players) == set(ready_players)
+        return False

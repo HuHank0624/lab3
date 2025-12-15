@@ -58,6 +58,20 @@ class LobbyManager:
         self.datastore.leave_room(room_id, username)
         return {"status": "ok"}
 
+    def set_ready(self, room_id: str, username: str, ready: bool) -> Dict[str, Any]:
+        """Set player ready status."""
+        room = self.datastore.get_room(room_id)
+        if not room:
+            return {"status": "error", "message": "Room not found"}
+        if username not in room.get("players", []):
+            return {"status": "error", "message": "You are not in this room"}
+        if room["status"] != "waiting":
+            return {"status": "error", "message": "Game already started"}
+        
+        if self.datastore.set_player_ready(room_id, username, ready):
+            return {"status": "ok", "ready": ready}
+        return {"status": "error", "message": "Failed to update ready status"}
+
     def close_room(self, room_id: str) -> Dict[str, Any]:
         """Close/delete a room and stop any running game server."""
         room = self.datastore.get_room(room_id)
@@ -85,6 +99,13 @@ class LobbyManager:
             return {"status": "error", "message": "Game already started"}
         if room.get("host") != username:
             return {"status": "error", "message": "Only the host can start the game"}
+        
+        # Check if all players are ready
+        if not self.datastore.are_all_players_ready(room_id):
+            players = room.get("players", [])
+            ready_players = room.get("ready_players", [])
+            not_ready = [p for p in players if p not in ready_players]
+            return {"status": "error", "message": f"Not all players are ready. Waiting for: {', '.join(not_ready)}"}
 
         game = self.datastore.get_game(room["game_id"])
         if not game:
