@@ -388,9 +388,8 @@ class TetrisServer:
                 player.hard_drop()
                 self.lock_and_spawn(player)
                 moved = True
-            elif action == "quit" or action == "surrender":
+            elif action == "quit":
                 player.game_over = True
-                print(f"[TetrisServer] Player {player.player_id} ({player.name}) {'surrendered' if action == 'surrender' else 'quit'}!")
                 self.check_winner()
                 return
         

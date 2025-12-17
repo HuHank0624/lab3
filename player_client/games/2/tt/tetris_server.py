@@ -250,10 +250,9 @@ class TetrisPlayer:
 
 
 class TetrisServer:
-    def __init__(self, host: str, port: int, num_players: int = 2):
+    def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.num_players = max(2, min(num_players, 4))  # 2-4 players
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         
@@ -270,13 +269,13 @@ class TetrisServer:
         self.sock.bind((self.host, self.port))
         self.sock.listen(5)
         print(f"[TetrisServer] Listening on {self.host}:{self.port}")
-        print(f"Waiting for {self.num_players} players...")
+        print("Waiting for 2 players...")
         
-        # Accept connections until we have enough players
-        while self.connections_count < self.num_players:
+        # Accept exactly 2 connections
+        while self.connections_count < 2:
             client_sock, addr = self.sock.accept()
             self.connections_count += 1
-            print(f"[TetrisServer] Connection from {addr} ({self.connections_count}/{self.num_players})")
+            print(f"[TetrisServer] Connection from {addr} ({self.connections_count}/2)")
             t = threading.Thread(target=self.handle_join, args=(client_sock,), daemon=True)
             t.start()
         
@@ -308,7 +307,7 @@ class TetrisServer:
             
             should_start = False
             with self.lock:
-                if len(self.players) >= self.num_players:
+                if len(self.players) >= 2:
                     send_json(sock, {"type": "error", "message": "Game full"})
                     sock.close()
                     return
@@ -318,7 +317,7 @@ class TetrisServer:
                 self.players[player_id] = player
                 
                 # Check if we should start (inside lock)
-                if len(self.players) == self.num_players and not self.game_started:
+                if len(self.players) == 2 and not self.game_started:
                     should_start = True
             
             send_json(sock, {
@@ -327,9 +326,8 @@ class TetrisServer:
                 "name": name,
                 "rows": ROWS,
                 "cols": COLS,
-                "total_players": self.num_players,
             })
-            print(f"[TetrisServer] Player {player_id} ({name}) joined ({len(self.players)}/{self.num_players})")
+            print(f"[TetrisServer] Player {player_id} ({name}) joined")
             
             if should_start:
                 self.start_game()
@@ -388,9 +386,8 @@ class TetrisServer:
                 player.hard_drop()
                 self.lock_and_spawn(player)
                 moved = True
-            elif action == "quit" or action == "surrender":
+            elif action == "quit":
                 player.game_over = True
-                print(f"[TetrisServer] Player {player.player_id} ({player.name}) {'surrendered' if action == 'surrender' else 'quit'}!")
                 self.check_winner()
                 return
         
@@ -486,10 +483,9 @@ def main():
     parser = argparse.ArgumentParser(description="Tetris Battle Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind")
     parser.add_argument("--port", type=int, required=True, help="Port")
-    parser.add_argument("--players", type=int, default=2, help="Number of players")
     args = parser.parse_args()
     
-    server = TetrisServer(args.host, args.port, args.players)
+    server = TetrisServer(args.host, args.port)
     server.start()
 
 

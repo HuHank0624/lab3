@@ -74,9 +74,9 @@ class GameRuntime:
             
             self.running_servers[room_id] = proc
             
-            # Give the server a moment to start and bind to the port
+            # Give the server time to start and bind to the port
             import time
-            time.sleep(0.5)
+            time.sleep(1.0)  # Increased from 0.5 to ensure server is ready
             
             # Check if the process is still running
             if proc.poll() is not None:

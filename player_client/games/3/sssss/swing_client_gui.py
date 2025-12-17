@@ -243,13 +243,10 @@ class SwingGUI:
     def connect_and_run(self):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(20)  # 20 second timeout
-            self.status_label.config(text=f"Connecting to {self.host}:{self.port}...")
-            self.root.update()
-            
+            self.sock.settimeout(15)
             self.sock.connect((self.host, self.port))
             self.sock.settimeout(None)
-            self.status_label.config(text="Connected! Waiting for players...")
+            self.status_label.config(text="Connected! Waiting...")
 
             send_json(self.sock, {"type": "join", "player_name": self.name})
 
@@ -259,10 +256,10 @@ class SwingGUI:
             self.root.mainloop()
 
         except ConnectionRefusedError:
-            messagebox.showerror("Error", f"Cannot connect to {self.host}:{self.port}\nGame server may not be ready yet.")
+            messagebox.showerror("Error", f"Cannot connect to {self.host}:{self.port}")
             self.root.destroy()
         except socket.timeout:
-            messagebox.showerror("Error", f"Connection timed out to {self.host}:{self.port}")
+            messagebox.showerror("Error", "Connection timed out")
             self.root.destroy()
         except Exception as e:
             messagebox.showerror("Error", str(e))

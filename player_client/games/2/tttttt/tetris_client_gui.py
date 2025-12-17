@@ -163,14 +163,6 @@ class TetrisGUI:
             tk.Label(controls_frame, text=f"{key}: {action}", font=("Arial", 9),
                      fg="#888", bg="#0f0f23").pack(anchor="w")
         
-        # Surrender button
-        self.surrender_btn = tk.Button(
-            center_frame, text="Surrender", command=self.surrender,
-            font=("Arial", 10, "bold"), bg="#dc2626", fg="white",
-            width=10, cursor="hand2", state=tk.DISABLED
-        )
-        self.surrender_btn.pack(pady=15)
-        
         # Right side - Opponent board
         right_frame = tk.Frame(main_frame, bg="#0f0f23")
         right_frame.pack(side=tk.LEFT, padx=10)
@@ -210,17 +202,6 @@ class TetrisGUI:
                 send_json(self.sock, {"type": action})
             except:
                 pass
-
-    def surrender(self):
-        """Surrender the game."""
-        if self.game_over or not self.game_started:
-            return
-        if messagebox.askyesno("Surrender", "Are you sure you want to surrender?"):
-            if self.sock:
-                try:
-                    send_json(self.sock, {"type": "surrender"})
-                except:
-                    pass
 
     def draw_board(self):
         """Draw the player's board."""
@@ -377,7 +358,6 @@ class TetrisGUI:
             self.next_piece = msg.get("next_piece")
             self.score = msg.get("score", 0)
             self.status_label.config(text="PLAYING!")
-            self.surrender_btn.config(state=tk.NORMAL)
             self.draw_board()
             self.draw_next_piece()
         
