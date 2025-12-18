@@ -98,6 +98,14 @@ class SwingServer:
 
         if len(self.players) >= MIN_PLAYERS:
             self.start_game()
+            
+            # Wait for game to finish (keep main thread alive)
+            while not self.game_over:
+                time.sleep(0.5)
+            
+            # Give time for final messages to be sent
+            time.sleep(1)
+            print("[SwingServer] Game finished. Server shutting down.")
 
     def handle_player(self, sock: socket.socket):
         try:
