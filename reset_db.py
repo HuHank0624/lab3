@@ -29,13 +29,16 @@ def reset_db():
         json.dump({"rooms": []}, f, indent=2)
     print(f"[OK] Reset {rooms_path}")
 
-    # Clear server storage (uploaded game files)
+    # Clear server storage (uploaded game files and runtime)
     if os.path.exists(STORAGE_DIR):
         for item in os.listdir(STORAGE_DIR):
             item_path = os.path.join(STORAGE_DIR, item)
             if os.path.isdir(item_path):
                 shutil.rmtree(item_path)
-                print(f"[OK] Removed server storage: {item}")
+                print(f"[OK] Removed server storage folder: {item}")
+            elif os.path.isfile(item_path):
+                os.remove(item_path)
+                print(f"[OK] Removed server storage file: {item}")
     print(f"[OK] Cleared {STORAGE_DIR}")
 
     # Clear player downloaded zip files
