@@ -14,7 +14,7 @@ import time
 from typing import Dict, Any, Optional, List
 
 HEADER_FMT = "!I"
-GAME_DURATION = 30  # seconds
+GAME_DURATION = 10  # seconds
 MAX_PLAYERS = 8
 MIN_PLAYERS = 2
 
@@ -68,6 +68,7 @@ class SwingServer:
         
         self.players: Dict[int, Player] = {}
         self.lock = threading.Lock()
+        self.send_lock = threading.Lock()  # Lock for socket sends to prevent race conditions
         self.game_started = False
         self.game_over = False
         self.start_time = 0
@@ -186,9 +187,6 @@ class SwingServer:
             while not self.game_over and player.connected:
                 msg = recv_json(player.sock)
                 if msg is None:
-                    player.connected = False
-                    print(f"[SwingServer] Player {player.player_id} disconnected.")
-                    self.broadcast_player_left(player.player_id)
                     break
 
                 mtype = msg.get("type")
@@ -203,17 +201,26 @@ class SwingServer:
                             self.broadcast_state()
 
                 elif mtype == "quit":
-                    player.connected = False
-                    print(f"[SwingServer] Player {player.player_id} quit.")
-                    self.broadcast_player_left(player.player_id)
                     break
 
-        except ConnectionError:
-            player.connected = False
-            print(f"[SwingServer] Player {player.player_id} connection lost.")
+        except Exception as e:
+            print(f"[SwingServer] Player {player.player_id} error: {e}")
+        finally:
+            # Always mark as disconnected and notify others
+            if player.connected:
+                player.connected = False
+                print(f"[SwingServer] Player {player.player_id} ({player.name}) left.")
+                self.broadcast_player_left(player.player_id)
+            try:
+                player.sock.close()
+            except:
+                pass
 
     def broadcast_state(self):
         """Send current game state to all players."""
+        if self.game_over:
+            return
+            
         elapsed = time.time() - self.start_time
         remaining = max(0, GAME_DURATION - elapsed)
         
@@ -222,28 +229,37 @@ class SwingServer:
             for p in self.players.values()
         ]
         
-        for player in self.players.values():
-            if player.connected:
-                try:
-                    send_json(player.sock, {
-                        "type": "state",
-                        "time_remaining": int(remaining),
-                        "scores": scores,
-                    })
-                except:
-                    player.connected = False
+        msg = {
+            "type": "state",
+            "time_remaining": int(remaining),
+            "scores": scores,
+        }
+        
+        with self.send_lock:
+            for player in list(self.players.values()):
+                if player.connected:
+                    try:
+                        send_json(player.sock, msg)
+                    except:
+                        player.connected = False
 
     def broadcast_player_left(self, player_id: int):
-        """Notify all players that someone left."""
-        for player in self.players.values():
-            if player.connected and player.player_id != player_id:
-                try:
-                    send_json(player.sock, {
-                        "type": "player_left",
-                        "player_id": player_id,
-                    })
-                except:
-                    pass
+        """Notify all players that someone left. Game continues with remaining players."""
+        left_player_name = self.players[player_id].name if player_id in self.players else f"Player {player_id}"
+        
+        msg = {
+            "type": "player_left",
+            "player_id": player_id,
+            "player_name": left_player_name,
+        }
+        
+        with self.send_lock:
+            for player in list(self.players.values()):
+                if player.connected and player.player_id != player_id:
+                    try:
+                        send_json(player.sock, msg)
+                    except:
+                        pass
 
     def end_game(self):
         """End the game and announce winner."""
@@ -252,29 +268,37 @@ class SwingServer:
                 return
             self.game_over = True
 
-        # Find winner(s)
-        max_score = max(p.swing_count for p in self.players.values())
-        winners = [p for p in self.players.values() if p.swing_count == max_score]
+        # Find winner(s) from connected players only, or all if none connected
+        connected = [p for p in self.players.values() if p.connected]
+        all_players = list(self.players.values())
+        
+        if connected:
+            max_score = max(p.swing_count for p in all_players)
+            winners = [p for p in all_players if p.swing_count == max_score]
+        else:
+            max_score = 0
+            winners = []
 
         final_scores = [
             {"id": p.player_id, "name": p.name, "score": p.swing_count}
-            for p in sorted(self.players.values(), key=lambda x: -x.swing_count)
+            for p in sorted(all_players, key=lambda x: -x.swing_count)
         ]
 
         print(f"[SwingServer] Game over! Winner(s): {[w.name for w in winners]} with {max_score} swings")
 
-        for player in self.players.values():
-            if player.connected:
-                is_winner = player in winners
-                try:
-                    send_json(player.sock, {
-                        "type": "game_over",
-                        "result": "win" if is_winner else "lose",
-                        "final_scores": final_scores,
-                        "winner_names": [w.name for w in winners],
-                    })
-                except:
-                    pass
+        with self.send_lock:
+            for player in list(self.players.values()):
+                if player.connected:
+                    is_winner = player in winners
+                    try:
+                        send_json(player.sock, {
+                            "type": "game_over",
+                            "result": "win" if is_winner else "lose",
+                            "final_scores": final_scores,
+                            "winner_names": [w.name for w in winners],
+                        })
+                    except:
+                        pass
 
 
 def main():

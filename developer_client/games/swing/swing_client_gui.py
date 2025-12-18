@@ -259,8 +259,8 @@ class SwingGUI:
             self.update_scores(msg.get("scores", []))
 
         elif mtype == "player_left":
-            pid = msg.get("player_id")
-            self.status_label.config(text=f"Player {pid + 1} left")
+            pname = msg.get("player_name", f"Player {msg.get('player_id', 0) + 1}")
+            self.status_label.config(text=f"{pname} left the game", fg="#ffaa00")
 
         elif mtype == "game_over":
             self.game_over = True
