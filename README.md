@@ -4,7 +4,7 @@ A multiplayer game platform with lobby, store, developer upload, and game runtim
 
 ---
 
-## 🚀 How to Run
+## How to Run
 
 ### 1. Start Server (on remote machine)
 ```bash
@@ -43,7 +43,7 @@ python -m player_client.client
 
 ---
 
-## 📋 Menu Options
+## Menu Options
 
 ### Developer Client
 
@@ -108,7 +108,7 @@ python -m player_client.client
 
 ---
 
-## 🏗️ Implementation Details
+## Implementation Details
 
 ### Server Side (`server/`)
 
@@ -161,7 +161,7 @@ python -m player_client.client
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 lab3/
@@ -199,7 +199,7 @@ lab3/
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 Edit `config.py`:
 ```python
@@ -209,7 +209,7 @@ SERVER_PORT = 10167
 
 ---
 
-## 🎮 Available Games
+## Available Games
 
 | Game | Description | Players |
 |------|-------------|---------|
@@ -219,7 +219,7 @@ SERVER_PORT = 10167
 
 ---
 
-## 📝 Server Management
+## Server Management
 
 | Task | Command |
 |------|---------|
