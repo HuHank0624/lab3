@@ -58,10 +58,9 @@ class SwingGUI:
         self.game_started = False
         self.game_over = False
         
-        # Sword display (no animation to avoid lag)
-        self.current_direction = None  # 'left', 'right', or None
-        self.last_swing_time = 0
-        self.swing_cooldown = 0.05  # 50ms cooldown between visual updates
+        # Sword animation
+        self.sword_angle = 0  # -45 to 45 degrees
+        self.target_angle = 0
 
         # GUI Setup
         self.root = tk.Tk()
@@ -129,22 +128,73 @@ class SwingGUI:
         ).pack(pady=15)
 
     def _draw_sword(self):
-        """Draw simple sword indicator based on current direction."""
+        """Draw the sword on canvas with current angle."""
         self.canvas.delete("all")
         
-        # Background
-        self.canvas.create_rectangle(0, 0, 300, 200, fill="#16213e", outline="")
+        cx, cy = 150, 180  # Pivot point
+        sword_length = 130
+        
+        angle_rad = math.radians(self.sword_angle - 90)
+        tip_x = cx + sword_length * math.cos(angle_rad)
+        tip_y = cy + sword_length * math.sin(angle_rad)
+        
+        # Blade glow
+        self.canvas.create_line(cx, cy, tip_x, tip_y, width=18, fill="#4a4a8a", capstyle=tk.ROUND)
+        # Main blade
+        self.canvas.create_line(cx, cy, tip_x, tip_y, width=12, fill="#c0c0c0", capstyle=tk.ROUND)
+        # Highlight
+        hl_len = sword_length * 0.75
+        hl_x = cx + hl_len * math.cos(angle_rad)
+        hl_y = cy + hl_len * math.sin(angle_rad)
+        self.canvas.create_line(
+            cx + 15 * math.cos(angle_rad), cy + 15 * math.sin(angle_rad),
+            hl_x, hl_y, width=3, fill="#ffffff", capstyle=tk.ROUND
+        )
+        
+        # Crossguard
+        perp = angle_rad + math.pi / 2
+        gw = 30
+        self.canvas.create_line(
+            cx + gw * math.cos(perp), cy + gw * math.sin(perp),
+            cx - gw * math.cos(perp), cy - gw * math.sin(perp),
+            width=7, fill="#ffd700", capstyle=tk.ROUND
+        )
+        
+        # Handle
+        hl = 22
+        hx = cx - hl * math.cos(angle_rad)
+        hy = cy - hl * math.sin(angle_rad)
+        self.canvas.create_line(cx, cy, hx, hy, width=9, fill="#8B4513", capstyle=tk.ROUND)
+        
+        # Pommel
+        px = cx - (hl + 5) * math.cos(angle_rad)
+        py = cy - (hl + 5) * math.sin(angle_rad)
+        self.canvas.create_oval(px - 7, py - 7, px + 7, py + 7, fill="#ffd700", outline="#b8860b", width=2)
         
         # Direction indicators
-        left_c = "#e94560" if self.current_direction == "left" else "#444"
-        right_c = "#e94560" if self.current_direction == "right" else "#444"
+        left_c = "#e94560" if self.sword_angle < 0 else "#444"
+        right_c = "#e94560" if self.sword_angle > 0 else "#444"
+        self.canvas.create_text(50, 30, text="◄", font=("Arial", 28, "bold"), fill=left_c)
+        self.canvas.create_text(250, 30, text="►", font=("Arial", 28, "bold"), fill=right_c)
+
+    def _animate_sword(self):
+        """Animate sword swing."""
+        if abs(self.sword_angle - self.target_angle) < 3:
+            self.sword_angle = self.target_angle
+            self._draw_sword()
+            if self.target_angle != 0:
+                self.root.after(80, self._reset_sword)
+            return
         
-        # Large direction arrows
-        self.canvas.create_text(75, 100, text="◄", font=("Arial", 60, "bold"), fill=left_c)
-        self.canvas.create_text(225, 100, text="►", font=("Arial", 60, "bold"), fill=right_c)
-        
-        # Center sword icon (static)
-        self.canvas.create_text(150, 100, text="⚔", font=("Arial", 40), fill="#ffd700")
+        step = 10 if self.sword_angle < self.target_angle else -10
+        self.sword_angle += step
+        self._draw_sword()
+        self.root.after(15, self._animate_sword)
+    
+    def _reset_sword(self):
+        """Reset sword to center."""
+        self.target_angle = 0
+        self._animate_sword()
 
     def _bind_keys(self):
         self.root.bind("<Left>", lambda e: self.swing("left"))
@@ -154,19 +204,11 @@ class SwingGUI:
     def swing(self, direction: str):
         if not self.game_started or self.game_over:
             return
-        
-        import time
-        current_time = time.time()
-        
         if self.sock:
             try:
                 send_json(self.sock, {"type": "swing", "direction": direction})
-                
-                # Only update visual if enough time has passed (prevent lag)
-                if current_time - self.last_swing_time > self.swing_cooldown:
-                    self.current_direction = direction
-                    self._draw_sword()
-                    self.last_swing_time = current_time
+                self.target_angle = -45 if direction == "left" else 45
+                self._animate_sword()
             except:
                 pass
 
