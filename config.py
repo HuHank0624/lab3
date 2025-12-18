@@ -12,4 +12,4 @@
 #   - 127.0.0.1 (localhost)
 
 SERVER_HOST = "linux1.cs.nycu.edu.tw"
-SERVER_PORT = 10167  # Using student ID suffix to avoid conflicts
+SERVER_PORT = 20167  # Using port above 20000 to avoid conflicts
