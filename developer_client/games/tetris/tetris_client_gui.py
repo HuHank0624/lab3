@@ -163,13 +163,13 @@ class TetrisGUI:
             tk.Label(controls_frame, text=f"{key}: {action}", font=("Arial", 9),
                      fg="#888", bg="#0f0f23").pack(anchor="w")
         
-        # Surrender button
-        self.surrender_btn = tk.Button(
-            center_frame, text="Surrender", command=self.surrender,
+        # Quit button
+        self.quit_btn = tk.Button(
+            center_frame, text="Quit Game", command=self.quit_game,
             font=("Arial", 10, "bold"), bg="#dc2626", fg="white",
-            width=10, cursor="hand2", state=tk.DISABLED
+            width=10, cursor="hand2"
         )
-        self.surrender_btn.pack(pady=15)
+        self.quit_btn.pack(pady=15)
         
         # Right side - Opponent board
         right_frame = tk.Frame(main_frame, bg="#0f0f23")
@@ -211,16 +211,19 @@ class TetrisGUI:
             except:
                 pass
 
-    def surrender(self):
-        """Surrender the game."""
-        if self.game_over or not self.game_started:
-            return
-        if messagebox.askyesno("Surrender", "Are you sure you want to surrender?"):
-            if self.sock:
-                try:
-                    send_json(self.sock, {"type": "surrender"})
-                except:
-                    pass
+    def quit_game(self):
+        """Quit the game."""
+        if self.sock:
+            try:
+                send_json(self.sock, {"type": "quit"})
+            except:
+                pass
+        self.game_over = True
+        self.root.destroy()
+
+    def on_close(self):
+        """Handle window close."""
+        self.quit_game()
 
     def draw_board(self):
         """Draw the player's board."""
@@ -306,18 +309,6 @@ class TetrisGUI:
                 outline="#2a2a4e"
             )
 
-    def quit_game(self):
-        if self.sock:
-            try:
-                send_json(self.sock, {"type": "quit"})
-            except:
-                pass
-        self.game_over = True
-        self.root.destroy()
-
-    def on_close(self):
-        self.quit_game()
-
     def connect_and_run(self):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -377,7 +368,6 @@ class TetrisGUI:
             self.next_piece = msg.get("next_piece")
             self.score = msg.get("score", 0)
             self.status_label.config(text="PLAYING!")
-            self.surrender_btn.config(state=tk.NORMAL)
             self.draw_board()
             self.draw_next_piece()
         
@@ -404,10 +394,10 @@ class TetrisGUI:
             
             if result == "win":
                 self.status_label.config(text="YOU WIN!", fg="#00ff88")
-                messagebox.showinfo("Victory!", f"Congratulations! You won!")
+                messagebox.showinfo("Victory!", f"Congratulations!\nYou won the game!")
             else:
-                self.status_label.config(text="YOU LOSE", fg="#ff4444")
-                messagebox.showinfo("Game Over", f"{winner} wins!")
+                self.status_label.config(text="GAME OVER", fg="#ff4444")
+                messagebox.showinfo("Game Over", f"Winner: {winner}")
         
         elif mtype == "error":
             messagebox.showerror("Error", msg.get("message", "Unknown error"))
